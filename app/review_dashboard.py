@@ -28,6 +28,7 @@ DATA_PATHS = [
     Path("data/feedback"),
     Path("data/metrics"),
     Path("data/processed/vector_store"),
+    Path("logs"),
 ]
 for path in DATA_PATHS:
     path.mkdir(parents=True, exist_ok=True)

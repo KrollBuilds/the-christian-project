@@ -9,6 +9,7 @@ from __future__ import annotations
 # Developer toggle: st.session_state["developer_mode"] = True to show tonal metrics
 
 import json
+import logging
 import os
 import sys
 from datetime import datetime, timezone
@@ -32,6 +33,17 @@ from config import SETTINGS
 
 load_dotenv()
 
+# Preflight environment validation for Railway deployments
+required_vars = ["OPENAI_API_KEY", "ACCESS_CODE", "DASHBOARD_PASSCODE"]
+missing_vars = [var for var in required_vars if not os.getenv(var)]
+if missing_vars:
+    sys.exit(f"Missing environment variables: {', '.join(missing_vars)}")
+
+# Configure logging early for deployment diagnostics
+logging.basicConfig(level=logging.INFO)
+logging.info("🚀 Starting The Christian Project Streamlit server...")
+logging.info(f"Assigned port: {os.getenv('PORT')}")
+
 # Ensure Hugging Face cache uses mounted storage when available
 os.environ["HF_HOME"] = os.environ.get("HF_HOME", "data/cache")
 
@@ -40,6 +52,7 @@ DATA_PATHS = [
     Path("data/feedback"),
     Path("data/metrics"),
     Path("data/processed/vector_store"),
+    Path("logs"),
 ]
 for path in DATA_PATHS:
     path.mkdir(parents=True, exist_ok=True)
@@ -489,6 +502,8 @@ def run_chat_interface() -> None:
 
     with st.container():
         display_chat_history()
+
+    st.sidebar.markdown("✅ **System Status:** Online")
 
     if SETTINGS.get("privacy_disclaimer", True):
         st.caption(

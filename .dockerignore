@@ -1,8 +1,10 @@
-# Ignore cache and environments
+# --- Build and environment files ---
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
+*.so
+*.egg-info
 .mlenv/
 .venv/
 env/
@@ -13,21 +15,32 @@ venv/
 *.log
 .env
 
-# Ignore large data and logs
+# --- Cache directories ---
+__pycache__/
+build/
+dist/
+pip-wheel-metadata/
+root/.cache/
+cache/
+.tmp/
+
+# --- Data: include only small processed files ---
 data/*
-logs/
+!data/processed/
+!data/processed/wels_doctrine.jsonl
+!data/processed/qa_clean.jsonl
+
+# --- Exclude large embeddings and indexes ---
 *.index
 *.npy
 *.npz
 *.csv
 *.txt
-*.jsonl
+logs/
 
-# KEEP these files in the build
 !requirements.txt
 !Procfile
 !Dockerfile
-!README.md
 !app/
 !scripts/
 !config/

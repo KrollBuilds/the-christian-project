@@ -2,16 +2,24 @@
 
 from __future__ import annotations
 
+# TODO: integrate Firebase Auth for user accounts
+# TODO: move logs to encrypted storage (e.g., Supabase or Firestore)
+# TODO: implement admin metrics dashboard for usage and cost
+
 import csv
 import json
 import os
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timezone
 from io import StringIO
 from pathlib import Path
 from typing import Any, DefaultDict, Dict, List, Optional, Tuple
 
 import streamlit as st
+
+from app.auth_utils import get_current_user
+from app.privacy_utils import sanitize_text
+from config import SETTINGS
 
 DATA_DIR = Path("data") / "feedback"
 FEEDBACK_PATH = DATA_DIR / "feedback_log.json"
@@ -23,6 +31,23 @@ st.set_page_config(
     page_icon="📖",
     layout="wide",
 )
+
+
+def enforce_access_code() -> None:
+    if not SETTINGS.get("access_control", True):
+        return
+    access_code = os.getenv("ACCESS_CODE")
+    if not access_code:
+        return
+    code = st.text_input("Access code", type="password", key="access_code_prompt")
+    if not code:
+        st.stop()
+    if code != access_code:
+        st.error("Invalid access code.")
+        st.stop()
+
+
+enforce_access_code()
 
 BACKGROUND_STYLE = """
 <style>
@@ -209,8 +234,19 @@ def load_existing_reviews() -> List[Dict[str, Any]]:
 
 def record_review(review: Dict[str, Any]) -> None:
     DATA_DIR.mkdir(parents=True, exist_ok=True)
+    sanitized_review = {
+        "question": sanitize_text(review.get("question")),
+        "answer": sanitize_text(review.get("answer")),
+        "accuracy": sanitize_text(review.get("accuracy")),
+        "tone": sanitize_text(review.get("tone")),
+        "completeness": sanitize_text(review.get("completeness")),
+        "comments": sanitize_text(review.get("comments")) if review.get("comments") else None,
+        "reviewer": sanitize_text(review.get("reviewer")),
+        "timestamp": review.get("timestamp"),
+        "user_id": get_current_user(),
+    }
     with REVIEW_LOG_PATH.open("a", encoding="utf-8") as file:
-        file.write(json.dumps(review, ensure_ascii=True) + "\n")
+        file.write(json.dumps(sanitized_review, ensure_ascii=True) + "\n")
 
 
 def delete_review_entry(question: str, answer: str, reviewer: str) -> bool:
@@ -219,6 +255,10 @@ def delete_review_entry(question: str, answer: str, reviewer: str) -> bool:
 
     remaining_lines: List[str] = []
     removed = False
+
+    target_question = sanitize_text(question)
+    target_answer = sanitize_text(answer)
+    target_reviewer = sanitize_text(reviewer)
 
     with REVIEW_LOG_PATH.open("r", encoding="utf-8") as source:
         for line in source:
@@ -231,9 +271,9 @@ def delete_review_entry(question: str, answer: str, reviewer: str) -> bool:
                 remaining_lines.append(stripped)
                 continue
 
-            matches_question = entry.get("question") == question
-            matches_answer = entry.get("answer") == answer
-            matches_reviewer = entry.get("reviewer") == reviewer
+            matches_question = entry.get("question") == target_question
+            matches_answer = entry.get("answer") == target_answer
+            matches_reviewer = entry.get("reviewer") == target_reviewer
 
             if matches_question and matches_answer and matches_reviewer:
                 removed = True
@@ -302,7 +342,10 @@ def filter_entries(
         tone_score = entry.get("tone_score")
         question = entry.get("question", "")
         timestamp = entry.get("timestamp")
-        key = (entry.get("question"), entry.get("answer"))
+        key = (
+            sanitize_text(entry.get("question")),
+            sanitize_text(entry.get("answer")),
+        )
 
         if tone_score is not None and tone_score < tone_min:
             continue
@@ -327,7 +370,9 @@ def build_review_index(
         question = review.get("question")
         answer = review.get("answer")
         if question and answer:
-            index[(question, answer)].append(review)
+            index[
+                (sanitize_text(question), sanitize_text(answer))
+            ].append(review)
     return index
 
 
@@ -359,7 +404,7 @@ def review_card(
     timestamp = entry.get("timestamp")
     tone_score = entry.get("tone_score")
     readable_time = timestamp or "Unknown timestamp"
-    key = (question, answer)
+    key = (sanitize_text(question), sanitize_text(answer))
 
     existing_reviews = review_index.get(key, [])
     reviewer_review = next(
@@ -487,7 +532,7 @@ def review_card(
                 "completeness": completeness,
                 "comments": comments.strip() or None,
                 "reviewer": reviewer_name,
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
             }
             record_review(review_entry)
             st.session_state["save_success"] = True
@@ -529,12 +574,21 @@ def main() -> None:
 
     filtered_entries = filter_entries(entries, review_index)
 
+    def show_privacy_caption() -> None:
+        if SETTINGS.get("privacy_disclaimer", True):
+            st.caption(
+                "⚠️ Do not share personal or identifying information. Conversations are logged anonymously for quality improvement."
+            )
+
     if not filtered_entries:
         st.info("No entries available with the current filters.")
+        show_privacy_caption()
         return
 
     for entry in filtered_entries:
         review_card(entry, reviewer_name, review_index)
+
+    show_privacy_caption()
 
 
 if __name__ == "__main__":

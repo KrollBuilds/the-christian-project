@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+# TODO: integrate Firebase Auth for user accounts
+# TODO: move logs to encrypted storage (e.g., Supabase or Firestore)
+# TODO: implement admin metrics dashboard for usage and cost
+
 # Developer toggle: st.session_state["developer_mode"] = True to show tonal metrics
 
 import json
@@ -22,6 +26,10 @@ if PROJECT_ROOT not in sys.path:
 
 import streamlit as st  # noqa: E402  (import after sys.path adjustment)
 
+from app.auth_utils import get_current_user
+from app.privacy_utils import sanitize_text
+from config import SETTINGS
+
 load_dotenv()
 
 # To set key locally: echo "OPENAI_API_KEY=yourkey" > .env
@@ -35,6 +43,20 @@ client = OpenAI(api_key=OPENAI_API_KEY)
 # TODO: Secure key handling for multi-user hosting (user tokens vs global key).
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
+
+def enforce_access_code() -> None:
+    if not SETTINGS.get("access_control", True):
+        return
+    access_code = os.getenv("ACCESS_CODE")
+    if not access_code:
+        return
+    code = st.text_input("Access code", type="password", key="access_code_prompt")
+    if not code:
+        st.stop()
+    if code != access_code:
+        st.error("Invalid access code.")
+        st.stop()
 
 try:
     from scripts.query_rag import (  # noqa: E402
@@ -76,6 +98,8 @@ st.set_page_config(
     page_icon="✝️",
     layout="centered",
 )
+
+enforce_access_code()
 
 st.markdown("""
 <style>
@@ -179,7 +203,7 @@ def ensure_feedback_log() -> Path:
     return feedback_dir / "feedback_log.json"
 
 
-def append_feedback(entry: Dict[str, str]) -> None:
+def append_feedback(entry: Dict[str, Any]) -> None:
     log_path = ensure_feedback_log()
     if log_path.exists():
         with log_path.open("r", encoding="utf-8") as log_file:
@@ -190,11 +214,19 @@ def append_feedback(entry: Dict[str, str]) -> None:
     else:
         feedback_data = []
 
-    feedback_data.append(entry)
+    sanitized_entry = {
+        "question": sanitize_text(entry.get("question")),
+        "answer": sanitize_text(entry.get("answer")),
+        "timestamp": entry.get("timestamp"),
+        "feedback": sanitize_text(entry.get("feedback")),
+        "user_id": get_current_user(),
+    }
+
+    feedback_data.append(sanitized_entry)
     with log_path.open("w", encoding="utf-8") as log_file:
         json.dump(feedback_data, log_file, ensure_ascii=True, indent=2)
 
-    st.session_state.feedback_log.append(entry)
+    st.session_state.feedback_log.append(sanitized_entry)
 
 
 def render_header() -> None:
@@ -435,6 +467,11 @@ def run_chat_interface() -> None:
 
     with st.container():
         display_chat_history()
+
+    if SETTINGS.get("privacy_disclaimer", True):
+        st.caption(
+            "⚠️ Do not share personal or identifying information. Conversations are logged anonymously for quality improvement."
+        )
 
     user_input = st.chat_input(
         "Ask a theological question...", key="user_input"

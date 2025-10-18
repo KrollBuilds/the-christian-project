@@ -8,7 +8,7 @@ import os
 import re
 import sys
 import textwrap
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
@@ -20,6 +20,27 @@ import faiss
 import numpy as np
 from sentence_transformers import SentenceTransformer
 
+try:
+    from app.auth_utils import get_current_user
+except Exception:  # pragma: no cover - fallback for CLI usage
+    def get_current_user() -> str:
+        return "guest"
+
+try:
+    from app.privacy_utils import sanitize_text
+except Exception:  # pragma: no cover - fallback for CLI usage
+    def sanitize_text(text: object) -> str:
+        if text is None:
+            return ""
+        return str(text).replace("@", "[at]").strip()[:2000]
+
+try:
+    from scripts.track_usage import record_usage
+except Exception:  # pragma: no cover - fallback when metrics disabled
+    def record_usage(*args, **kwargs) -> None:
+        return None
+
+from config import SETTINGS
 from config.prompt_templates import (
     FALLBACK_PROMPT,
     SYSTEM_PROMPT,
@@ -182,11 +203,12 @@ def log_generation(
 ) -> None:
     LOG_DIR.mkdir(parents=True, exist_ok=True)
     log_entry = {
-        "timestamp": datetime.utcnow().isoformat(),
-        "question": question,
-        "answer": answer,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "question": sanitize_text(question),
+        "answer": sanitize_text(answer),
         "tone_score": tone_score,
         "warnings": warnings or [],
+        "user_id": get_current_user(),
     }
     with LOG_FILE.open("a", encoding="utf-8") as log_file:
         log_file.write(json.dumps(log_entry, ensure_ascii=True) + "\n")
@@ -272,6 +294,15 @@ def run_gpt_synthesis(
         )
     except Exception as exc:
         return f"OpenAI API error: {exc}"
+
+    usage = getattr(response, "usage", None)
+    if usage is not None and SETTINGS.get("usage_logging", True):
+        prompt_tokens = getattr(usage, "prompt_tokens", 0) or 0
+        completion_tokens = getattr(usage, "completion_tokens", 0) or 0
+        try:
+            record_usage(int(prompt_tokens), int(completion_tokens), model=model_name)
+        except Exception:
+            pass
 
     if not getattr(response, "choices", None):
         return "OpenAI API returned no choices."

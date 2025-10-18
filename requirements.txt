@@ -1,0 +1,9 @@
+pandas
+faiss-cpu
+sentence-transformers
+openai
+langchain
+python-dotenv
+streamlit
+requests
+beautifulsoup4

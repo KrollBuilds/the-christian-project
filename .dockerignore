@@ -1,8 +1,39 @@
+# --- Build and environment files ---
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
+*.so
+*.egg-info
+.mlenv/
+.venv/
+env/
+venv/
+.idea/
+.vscode/
+.DS_Store
+*.log
 .env
-data/raw/*
-data/feedback/*
-data/metrics/*
-data/processed/vector_store/*
-logs/*
+
+# --- Cache directories ---
+__pycache__/
+build/
+dist/
+pip-wheel-metadata/
+root/.cache/
+cache/
+.tmp/
+
+# --- Data: include only small processed files ---
+data/*
+!data/processed/
+!data/processed/wels_doctrine.jsonl
+!data/processed/qa_clean.jsonl
+
+# --- Exclude large embeddings and indexes ---
+*.index
+*.npy
+*.npz
+*.csv
+*.txt
+logs/

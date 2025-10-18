@@ -32,6 +32,9 @@ from config import SETTINGS
 
 load_dotenv()
 
+# Ensure Hugging Face cache uses mounted storage when available
+os.environ["HF_HOME"] = os.environ.get("HF_HOME", "data/cache")
+
 # Ensure required data directories exist (supports Railway volume mounts)
 DATA_PATHS = [
     Path("data/feedback"),

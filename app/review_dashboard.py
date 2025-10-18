@@ -15,11 +15,22 @@ from io import StringIO
 from pathlib import Path
 from typing import Any, DefaultDict, Dict, List, Optional, Tuple
 
+from dotenv import load_dotenv
 import streamlit as st
 
 from app.auth_utils import get_current_user
 from app.privacy_utils import sanitize_text
 from config import SETTINGS
+
+load_dotenv()
+
+DATA_PATHS = [
+    Path("data/feedback"),
+    Path("data/metrics"),
+    Path("data/processed/vector_store"),
+]
+for path in DATA_PATHS:
+    path.mkdir(parents=True, exist_ok=True)
 
 DATA_DIR = Path("data") / "feedback"
 FEEDBACK_PATH = DATA_DIR / "feedback_log.json"
@@ -33,21 +44,31 @@ st.set_page_config(
 )
 
 
-def enforce_access_code() -> None:
+def enforce_access_code(state_key: str, prompt_label: str = "Access code") -> None:
     if not SETTINGS.get("access_control", True):
         return
     access_code = os.getenv("ACCESS_CODE")
     if not access_code:
         return
-    code = st.text_input("Access code", type="password", key="access_code_prompt")
+    if st.session_state.get(state_key):
+        return
+
+    code_key = f"{state_key}_input"
+    code = st.text_input(prompt_label, type="password", key=code_key)
     if not code:
         st.stop()
     if code != access_code:
         st.error("Invalid access code.")
         st.stop()
+    st.session_state[state_key] = True
+    st.session_state.pop(code_key, None)
+    if hasattr(st, "rerun"):
+        st.rerun()
+    else:
+        st.experimental_rerun()
 
 
-enforce_access_code()
+enforce_access_code("review_access_granted")
 
 BACKGROUND_STYLE = """
 <style>

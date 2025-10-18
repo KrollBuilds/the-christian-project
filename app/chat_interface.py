@@ -32,6 +32,15 @@ from config import SETTINGS
 
 load_dotenv()
 
+# Ensure required data directories exist (supports Railway volume mounts)
+DATA_PATHS = [
+    Path("data/feedback"),
+    Path("data/metrics"),
+    Path("data/processed/vector_store"),
+]
+for path in DATA_PATHS:
+    path.mkdir(parents=True, exist_ok=True)
+
 # To set key locally: echo "OPENAI_API_KEY=yourkey" > .env
 # For deployment: add OPENAI_API_KEY as an environment variable in the hosting platform.
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
@@ -45,18 +54,28 @@ client = OpenAI(api_key=OPENAI_API_KEY)
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 
-def enforce_access_code() -> None:
+def enforce_access_code(state_key: str, prompt_label: str = "Access code") -> None:
     if not SETTINGS.get("access_control", True):
         return
     access_code = os.getenv("ACCESS_CODE")
     if not access_code:
         return
-    code = st.text_input("Access code", type="password", key="access_code_prompt")
+    if st.session_state.get(state_key):
+        return
+
+    code_key = f"{state_key}_input"
+    code = st.text_input(prompt_label, type="password", key=code_key)
     if not code:
         st.stop()
     if code != access_code:
         st.error("Invalid access code.")
         st.stop()
+    st.session_state[state_key] = True
+    st.session_state.pop(code_key, None)
+    if hasattr(st, "rerun"):
+        st.rerun()
+    else:
+        st.experimental_rerun()
 
 try:
     from scripts.query_rag import (  # noqa: E402
@@ -99,7 +118,7 @@ st.set_page_config(
     layout="centered",
 )
 
-enforce_access_code()
+enforce_access_code("chat_access_granted")
 
 st.markdown("""
 <style>

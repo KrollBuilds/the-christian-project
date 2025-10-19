@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import os
 import re
 import sys
@@ -53,6 +54,8 @@ os.environ["TOKENIZERS_PARALLELISM"] = "false"
 QA_VECTOR_DIR = PROJECT_ROOT / "data" / "processed" / "vector_store"
 QA_INDEX_PATH = QA_VECTOR_DIR / "qa_faiss.index"
 QA_METADATA_PATH = QA_VECTOR_DIR / "qa_metadata.json"
+COMBINED_INDEX_PATH = QA_VECTOR_DIR / "combined_faiss.index"
+COMBINED_METADATA_PATH = QA_VECTOR_DIR / "combined_metadata.json"
 
 CONTEXT_VECTOR_DIR = PROJECT_ROOT / "data" / "processed" / "wels_embeddings"
 CONTEXT_INDEX_PATH = CONTEXT_VECTOR_DIR / "context_faiss.index"
@@ -61,12 +64,29 @@ CONTEXT_METADATA_PATH = CONTEXT_VECTOR_DIR / "context_metadata.json"
 EMBEDDING_MODEL_NAME = "all-MiniLM-L6-v2"
 DEFAULT_GPT_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o")
 
+logger = logging.getLogger(__name__)
+
 _QA_CACHE: Optional[Tuple[faiss.Index, List[dict]]] = None
 _CONTEXT_CACHE: Optional[Tuple[faiss.Index, List[dict]]] = None
 _MODEL_CACHE: Optional[SentenceTransformer] = None
 
 LOG_DIR = PROJECT_ROOT / "logs"
 LOG_FILE = LOG_DIR / "generation_log.jsonl"
+
+
+def _resolve_doctrine_paths() -> Tuple[Path, Path, str]:
+    if COMBINED_INDEX_PATH.exists() and COMBINED_METADATA_PATH.exists():
+        logger.info("Using combined doctrinal index (combined_faiss.index).")
+        return COMBINED_INDEX_PATH, COMBINED_METADATA_PATH, "combined"
+    if QA_INDEX_PATH.exists() and QA_METADATA_PATH.exists():
+        logger.info("Using legacy QA doctrinal index (qa_faiss.index).")
+        return QA_INDEX_PATH, QA_METADATA_PATH, "qa"
+    raise FileNotFoundError(
+        "No doctrinal FAISS index found. Ensure combined_faiss.index or qa_faiss.index exist under data/processed/vector_store."
+    )
+
+
+DOCTRINE_INDEX_PATH, DOCTRINE_METADATA_PATH, DOCTRINE_INDEX_LABEL = _resolve_doctrine_paths()
 
 
 def _load_index_and_metadata(
@@ -91,7 +111,7 @@ def get_cached_doctrine_index() -> Tuple[faiss.Index, List[dict]]:
     global _QA_CACHE
     if _QA_CACHE is None:
         _QA_CACHE = _load_index_and_metadata(
-            QA_INDEX_PATH, QA_METADATA_PATH, "doctrinal"
+            DOCTRINE_INDEX_PATH, DOCTRINE_METADATA_PATH, DOCTRINE_INDEX_LABEL
         )
     return _QA_CACHE
 
@@ -131,14 +151,28 @@ def format_truncated_answer(answer: str, limit: int = 400) -> str:
     return answer[: limit - 3] + "..."
 
 
+def _format_metadata_snippet(entry: Dict[str, object]) -> str:
+    question = entry.get("question")
+    answer = entry.get("answer")
+    if question and answer:
+        return f"Question: {question}\nAnswer: {answer}"
+
+    title = entry.get("title") or entry.get("question") or "Doctrinal Reference"
+    content = entry.get("content") or entry.get("answer") or ""
+    snippet = f"Title: {title}"
+    if content:
+        snippet += f"\nContent: {content}"
+    return snippet.strip()
+
+
 def build_doctrinal_context(entries: List[Dict[str, object]]) -> str:
     if not entries:
         return "No doctrinal sources available."
     parts = []
     for entry in entries:
-        question = entry.get("question", "")
-        answer = entry.get("answer", "")
-        parts.append(f"Question: {question}\nAnswer: {answer}")
+        snippet = _format_metadata_snippet(entry)
+        if snippet:
+            parts.append(snippet)
     return "\n\n".join(parts)
 
 
@@ -226,6 +260,7 @@ def retrieve_doctrinal_sources(question: str, top_k: int = 3) -> List[Dict[str, 
         entry = metadata[idx].copy()
         entry["score"] = float(score)
         entry["source_category"] = "doctrine"
+        entry["vector_source"] = DOCTRINE_INDEX_LABEL
         results.append(entry)
     return results
 
@@ -244,6 +279,17 @@ def retrieve_contextual_sources(question: str, top_k: int = 2) -> List[Dict[str,
         entry["source_category"] = "context"
         results.append(entry)
     return results
+
+
+def retrieve_doctrinal_snippets(question: str, top_k: int = 3) -> List[str]:
+    """Return human-readable doctrinal snippets for debugging or direct display."""
+    entries = retrieve_doctrinal_sources(question, top_k=top_k)
+    snippets: List[str] = []
+    for entry in entries:
+        snippet = _format_metadata_snippet(entry)
+        if snippet:
+            snippets.append(snippet)
+    return snippets
 
 
 def run_gpt_synthesis(

@@ -7,6 +7,7 @@ from __future__ import annotations
 # TODO: implement admin metrics dashboard for usage and cost
 
 # Developer toggle: st.session_state["developer_mode"] = True to show tonal metrics
+# TODO: Future Phase — Convert this Streamlit prototype into a FastAPI backend with REST endpoints for /query and /review.
 
 import json
 import logging

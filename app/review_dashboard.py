@@ -43,33 +43,32 @@ st.set_page_config(
     page_icon="📖",
     layout="wide",
 )
+def require_reviewer_auth() -> None:
+    """Password gate for the reviewer dashboard (separate from public chat)."""
 
-
-def enforce_access_code(state_key: str, prompt_label: str = "Access code") -> None:
-    if not SETTINGS.get("access_control", True):
-        return
-    access_code = os.getenv("ACCESS_CODE")
-    if not access_code:
-        return
-    if st.session_state.get(state_key):
-        return
-
-    code_key = f"{state_key}_input"
-    code = st.text_input(prompt_label, type="password", key=code_key)
-    if not code:
+    secret = st.secrets.get("REVIEW_DASHBOARD_PASS") or os.getenv("DASHBOARD_PASSCODE")
+    if not secret:
+        st.error(
+            "🔒 Reviewer password not configured. Set REVIEW_DASHBOARD_PASS (or DASHBOARD_PASSCODE) in your environment."
+        )
         st.stop()
-    if code != access_code:
-        st.error("Invalid access code.")
-        st.stop()
-    st.session_state[state_key] = True
-    st.session_state.pop(code_key, None)
-    if hasattr(st, "rerun"):
-        st.rerun()
-    else:
-        st.experimental_rerun()
+
+    if st.session_state.get("review_dashboard_authenticated"):
+        return
+
+    st.title("Pastoral Review Dashboard")
+    st.caption("Authorized reviewers only.")
+    password = st.text_input("Enter dashboard password:", type="password")
+    if st.button("Unlock dashboard"):
+        if password == secret:
+            st.session_state["review_dashboard_authenticated"] = True
+            st.experimental_rerun()
+        else:
+            st.error("Incorrect password. Please try again.")
+    st.stop()
 
 
-enforce_access_code("review_access_granted")
+require_reviewer_auth()
 
 BACKGROUND_STYLE = """
 <style>
@@ -173,25 +172,6 @@ textarea {
 
 
 st.markdown(BACKGROUND_STYLE, unsafe_allow_html=True)
-
-
-def authenticate() -> bool:
-    expected = os.environ.get("DASHBOARD_PASSCODE")
-    if not expected:
-        st.error("🔒 This dashboard is restricted to pastoral reviewers.")
-        return False
-
-    st.sidebar.header("Access")
-    entered = st.sidebar.text_input("Enter Passcode", type="password")
-    if not entered:
-        st.info("Enter the pastoral passcode to continue.")
-        return False
-
-    if entered != expected:
-        st.error("Incorrect passcode.")
-        return False
-
-    return True
 
 
 def load_feedback_entries() -> List[Dict[str, Any]]:
@@ -564,9 +544,6 @@ def review_card(
 
 
 def main() -> None:
-    if not authenticate():
-        return
-
     st.title("📖 Pastoral Review Dashboard")
     st.caption("Evaluate responses for theological accuracy, clarity, and tone.")
 

@@ -18,4 +18,5 @@ RUN pip3 install --no-cache-dir -r requirements.txt
 EXPOSE 8501
 
 # Run Streamlit via shell to ensure $PORT expands correctly
-CMD bash -c 'PORT=${PORT:-8501}; echo "🚀 Launching Streamlit on port $PORT"; streamlit run app/chat_interface.py --server.port=$PORT --server.address=0.0.0.0'
+CMD bash -c 'PORT=${PORT:-8080}; echo "🚀 Launching Streamlit on port $PORT"; streamlit run app/chat_interface.py --server.port=$PORT --server.address=0.0.0.0'
+

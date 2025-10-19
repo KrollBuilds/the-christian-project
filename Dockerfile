@@ -22,7 +22,7 @@ ENV STREAMLIT_SERVER_HEADLESS=true
 EXPOSE 8080
 
 # Basic health check so Railway detects readiness
-HEALTHCHECK CMD curl --fail http://127.0.0.1:${PORT:-8080}/_stcore/health || exit 1
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 CMD curl --silent --fail http://127.0.0.1:${PORT:-8080}/ || exit 1
 
 # Launch Streamlit bound to the provided port
-CMD bash -c 'PORT=${PORT:-8080}; echo "🚀 Launching Streamlit on port $PORT"; streamlit run app/chat_interface.py --server.port=$PORT --server.address=0.0.0.0 --server.enableCORS=false --server.enableXsrfProtection=false'
+CMD bash -c 'if [ -z "$PORT" ]; then echo "⚠️ PORT not set by environment; defaulting to 8080"; PORT=8080; else echo "✅ Detected PORT=$PORT"; fi; echo "🚀 Launching Streamlit on port $PORT"; streamlit run app/chat_interface.py --server.port=$PORT --server.address=0.0.0.0 --server.enableCORS=false --server.enableXsrfProtection=false'

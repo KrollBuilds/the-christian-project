@@ -9,9 +9,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends build-essential
 
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Use Railway's dynamic port
-ENV PYTHONUNBUFFERED=1
-ENV STREAMLIT_SERVER_HEADLESS=true
+# Copy and mark the startup script executable
+COPY start.sh /app/start.sh
+RUN chmod +x /app/start.sh
 
-# Add a fallback so it runs locally with port 8501 if $PORT is unset
-CMD bash -c "streamlit run app/chat_interface.py --server.port=${PORT:-8501} --server.address=0.0.0.0"
+EXPOSE 8501
+
+CMD ["/app/start.sh"]

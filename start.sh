@@ -10,6 +10,9 @@ PORT=${PORT:-8501}
 
 echo "🚀 Starting Streamlit on port $PORT..."
 
+# Ensure Streamlit reads an integer port value from the environment if needed
+export STREAMLIT_SERVER_PORT=$PORT
+
 # Launch Streamlit and bind to all interfaces
 exec streamlit run app/chat_interface.py \
     --server.port=$PORT \

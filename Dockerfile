@@ -9,8 +9,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends build-essential
 
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy and mark the startup script executable
-COPY start.sh /app/start.sh
+# Ensure startup script is executable
 RUN chmod +x /app/start.sh
 
 EXPOSE 8501

@@ -34,10 +34,23 @@ from config import SETTINGS
 load_dotenv()
 
 # Preflight environment validation for Railway deployments
-required_vars = ["OPENAI_API_KEY", "ACCESS_CODE", "DASHBOARD_PASSCODE"]
-missing_vars = [var for var in required_vars if not os.getenv(var)]
-if missing_vars:
-    sys.exit(f"Missing environment variables: {', '.join(missing_vars)}")
+required_vars = ["OPENAI_API_KEY"]
+missing_required = [var for var in required_vars if not os.getenv(var)]
+if missing_required:
+    st.error(
+        "🚨 Missing required environment variables."
+        f" Set the following in Railway: {', '.join(missing_required)}"
+    )
+    st.stop()
+
+# Optional guards for forthcoming auth features
+optional_vars = ["ACCESS_CODE", "DASHBOARD_PASSCODE"]
+missing_optional = [var for var in optional_vars if not os.getenv(var)]
+if missing_optional:
+    logging.warning(
+        "Optional secrets missing (ACCESS_CODE / DASHBOARD_PASSCODE). "
+        "Features relying on them are temporarily disabled."
+    )
 
 # Configure logging early for deployment diagnostics
 logging.basicConfig(level=logging.INFO)

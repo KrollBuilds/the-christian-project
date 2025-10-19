@@ -126,7 +126,8 @@ try:
         retrieve_contextual_sources,
         retrieve_doctrinal_sources,
     )
-except Exception:
+except Exception as exc:
+    logging.exception("Failed to import retrieval utilities: %s", exc)
     st.set_page_config(
         page_title="The Christian Project",
         page_icon="✝️",
@@ -144,6 +145,7 @@ except Exception:
     st.error(
         "⚠️ Unable to load retrieval utilities. Please verify the `scripts` package is present and importable."
     )
+    st.caption(f"Debug detail: {exc}")
     st.stop()
 
 

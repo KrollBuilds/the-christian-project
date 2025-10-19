@@ -80,6 +80,8 @@ def enforce_access_code(state_key: str, prompt_label: str = "Access code") -> No
         return
 
     code_key = f"{state_key}_input"
+    st.markdown("### 🔑 Access Required")
+    st.info("Enter the reviewer passcode provided by your administrator to continue.")
     code = st.text_input(prompt_label, type="password", key=code_key)
     if not code:
         st.stop()

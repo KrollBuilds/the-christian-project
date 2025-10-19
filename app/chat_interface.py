@@ -199,64 +199,90 @@ enforce_access_code("chat_access_granted")
 
 st.markdown("""
 <style>
+/* --- Global Background & Font --- */
 body, .stApp {
-    background-color: #f8f4ec;
-    color: #1b1b1b;
+    background-color: #f2ede3; /* slightly deeper parchment */
+    color: #1a120a;
     font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
 }
 
+/* --- Header --- */
 .stApp header, header {
-    box-shadow: 0 3px 8px rgba(0,0,0,0.08);
+    background-color: #f8f5ee;
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+    border-bottom: 1px solid #d8c9b8;
 }
 
+/* --- Chat Messages --- */
 .stChatMessage[data-testid="stChatMessage-User"] {
-    background-color: rgba(185, 146, 47, 0.12);
+    background-color: #f8e9be;
+    border: 1px solid #d6ba75;
     border-radius: 12px;
-    padding: 0.75rem;
+    padding: 0.9rem;
+    color: #2a1e12;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.08);
 }
 
 .stChatMessage[data-testid="stChatMessage-Assistant"] {
-    background-color: #fff9f3;
-    border: 1px solid #e6d6c4;
+    background-color: #ffffff;
+    border: 1px solid #e0d2be;
     border-radius: 12px;
-    padding: 0.9rem;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+    padding: 1rem;
+    box-shadow: 0 3px 6px rgba(0, 0, 0, 0.08);
 }
 
 .stChatMessage .stMarkdown p {
     color: #2a1e12 !important;
+    line-height: 1.6;
 }
 
+/* --- Inputs --- */
 .stChatInput textarea,
 .stTextInput>div>div>input {
-    background-color: #fff8ef !important;
+    background-color: #fffdfa !important;
     color: #1b1b1b !important;
+    border: 1px solid #d5c5b3 !important;
+    border-radius: 8px !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) inset;
 }
 
 .stChatInput textarea::placeholder {
-    color: #a38c74 !important;
+    color: #8f7c67 !important;
 }
 
+/* --- Alerts & Notifications --- */
 .stAlert, [data-testid="stNotification"] {
-    background-color: #fff1e0 !important;
-    color: #3b2e1e !important;
+    background-color: #fff3e6 !important;
+    color: #402d1a !important;
+    border-left: 4px solid #d08a32 !important;
     border-radius: 10px !important;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.06);
 }
 
+/* --- Buttons --- */
 .stButton>button {
-    border-radius: 6px !important;
-    background-color: #ece3d6 !important;
-    color: #2b2118 !important;
+    border-radius: 8px !important;
+    background-color: #c8a96f !important;
+    color: #fffdfa !important;
     font-weight: 600 !important;
     border: none !important;
+    padding: 0.4rem 0.9rem !important;
+    box-shadow: 0 2px 3px rgba(0, 0, 0, 0.1);
+    transition: all 0.15s ease-in-out;
 }
 
 .stButton>button:hover {
-    background-color: #e3d3bd !important;
+    background-color: #b08f56 !important;
+    box-shadow: 0 3px 5px rgba(0, 0, 0, 0.15);
 }
 
+/* --- Feedback Section --- */
 .feedback-wrapper {
     margin-top: 0.75rem;
+    background-color: #fdf8f2;
+    border: 1px solid #e0d0b6;
+    padding: 0.75rem;
+    border-radius: 8px;
 }
 
 .feedback-wrapper p {
@@ -265,16 +291,31 @@ body, .stApp {
     color: #3b2e1e;
 }
 
+/* --- Headings --- */
+h1, h2, h3, h4 {
+    color: #3c2c18 !important;
+    font-family: "Georgia", serif;
+}
+
+/* --- Context/Expandable Boxes --- */
+[data-testid="stExpander"] {
+    background-color: #fffdfa !important;
+    border: 1px solid #e1d3c0 !important;
+    border-radius: 8px !important;
+}
+
+/* --- Mobile adjustments --- */
 @media (max-width: 768px) {
     body {
-        background-color: #f3eddd;
+        background-color: #f3ecda;
     }
     .stChatMessage[data-testid="stChatMessage-User"],
     .stChatMessage[data-testid="stChatMessage-Assistant"] {
-        margin: 0.3rem 0;
+        margin: 0.4rem 0;
     }
 }
 </style>
+
 """, unsafe_allow_html=True)
 
 

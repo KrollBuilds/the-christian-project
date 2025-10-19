@@ -14,8 +14,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends build-essential
 # Install Python dependencies
 RUN pip3 install --no-cache-dir -r requirements.txt
 
-# Expose a default port (overridden by Railway's $PORT)
-EXPOSE 8501
+# Runtime configuration
+ENV PYTHONUNBUFFERED=1
+ENV STREAMLIT_SERVER_HEADLESS=true
 
-# Health check uses runtime port
-CMD bash -c 'PORT=${PORT:-8501}; echo "🚀 Launching Streamlit on port $PORT"; streamlit run app/chat_interface.py --server.port=$PORT --server.address=0.0.0.0'
+# Expose a default port (Railway overrides with $PORT)
+EXPOSE 8080
+
+# Basic health check so Railway detects readiness
+HEALTHCHECK CMD curl --fail http://127.0.0.1:${PORT:-8080}/_stcore/health || exit 1
+
+# Launch Streamlit bound to the provided port
+CMD bash -c 'PORT=${PORT:-8080}; echo "🚀 Launching Streamlit on port $PORT"; streamlit run app/chat_interface.py --server.port=$PORT --server.address=0.0.0.0 --server.enableCORS=false --server.enableXsrfProtection=false'

@@ -73,35 +73,37 @@ os.environ["TOKENIZERS_PARALLELISM"] = "false"
 def enforce_access_code(state_key: str, prompt_label: str = "Access code") -> None:
     if not SETTINGS.get("access_control", True):
         return
+
     access_code = os.getenv("ACCESS_CODE")
     if not access_code:
         return
+
     if st.session_state.get(state_key):
         return
 
-    prompt_container = st.container()
+    st.title("The Christian Project")
+    st.caption("Faithful answers for curious hearts.")
+    st.markdown("### 🔑 Access Required")
+    st.info("Enter the reviewer passcode provided by your administrator to continue.")
+
     code_key = f"{state_key}_input"
+    submit_key = f"{state_key}_submit"
+    code = st.text_input(prompt_label, type="password", key=code_key)
+    submitted = st.button("Unlock", key=submit_key)
 
-    with prompt_container:
-        st.title("The Christian Project")
-        st.caption("Faithful answers for curious hearts.")
-        st.markdown("### 🔑 Access Required")
-        st.info("Enter the reviewer passcode provided by your administrator to continue.")
-        code = st.text_input(prompt_label, type="password", key=code_key)
-        if not code:
-            st.stop()
-        if code != access_code:
+    if submitted:
+        if code == access_code:
+            st.session_state[state_key] = True
+            st.session_state.pop(code_key, None)
+            st.session_state.pop(submit_key, None)
+            if hasattr(st, "rerun"):
+                st.rerun()
+            else:
+                st.experimental_rerun()
+        else:
             st.error("Invalid access code.")
-            st.stop()
 
-    st.session_state[state_key] = True
-    st.session_state.pop(code_key, None)
-    prompt_container.empty()
-
-    if hasattr(st, "rerun"):
-        st.rerun()
-    else:
-        st.experimental_rerun()
+    st.stop()
 
 try:
     from scripts.query_rag import (  # noqa: E402

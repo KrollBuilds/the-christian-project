@@ -1,6 +1,6 @@
 # Default project settings
 project_name: The Christian Project
-access_control: true
+access_control: false
 privacy_disclaimer: true
 usage_logging: true
 auth_provider: firebase  # placeholder

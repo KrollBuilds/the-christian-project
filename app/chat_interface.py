@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import random
 import sys
 from datetime import datetime, timezone
 import time
@@ -71,6 +72,8 @@ DATA_PATHS = [
 for path in DATA_PATHS:
     path.mkdir(parents=True, exist_ok=True)
 
+FEEDBACK_LOG_PATH = Path("data/metrics/feedback_log.jsonl")
+
 # To set key locally: echo "OPENAI_API_KEY=yourkey" > .env
 # For deployment: add OPENAI_API_KEY as an environment variable in the hosting platform.
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
@@ -83,6 +86,38 @@ client = OpenAI(api_key=OPENAI_API_KEY)
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
+GRACE_MESSAGES = [
+    (
+        "Sorry, we're experiencing difficulties. Thank you for your patience.",
+        "Romans 8:28",
+    ),
+    ("Something went wrong, but God's plan never fails.", "Jeremiah 29:11"),
+    (
+        "Our system stumbled — faith reminds us we'll get back up.",
+        "2 Corinthians 12:9",
+    ),
+    (
+        "Please try again soon. The Lord is near to those who wait in hope.",
+        "Psalm 130:5",
+    ),
+]
+
+
+def show_grace_message() -> None:
+    message, verse = random.choice(GRACE_MESSAGES)
+    st.warning(f"🙏 {message}\n\n**{verse}**")
+
+
+def record_feedback(rating: str, question: str, answer: str) -> None:
+    entry = {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "rating": rating,
+        "question": sanitize_text(question),
+        "answer": sanitize_text(answer),
+    }
+    FEEDBACK_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with FEEDBACK_LOG_PATH.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(entry, ensure_ascii=True) + "\n")
 
 def enforce_access_code(state_key: str, prompt_label: str = "Access code") -> None:
     if not SETTINGS.get("access_control", True):
@@ -152,8 +187,6 @@ except Exception as exc:
 # Safeguard session state directly after imports
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
-if "feedback_log" not in st.session_state:
-    st.session_state.feedback_log = []
 
 
 st.set_page_config(
@@ -166,87 +199,78 @@ enforce_access_code("chat_access_granted")
 
 st.markdown("""
 <style>
-/* Base layout */
 body, .stApp {
-    background-color: #f6f2e7;        /* slightly deeper parchment */
-    color: #1b1b1b;                   /* strong neutral text */
+    background-color: #f8f4ec;
+    color: #1b1b1b;
     font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
 }
-header {
-    box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+
+.stApp header, header {
+    box-shadow: 0 3px 8px rgba(0,0,0,0.08);
 }
 
-/* Chat container */
-.chat-container {
-    max-width: 720px;
-    margin: 0 auto;
-    padding: 1.5rem 1rem 5rem 1rem;
+.stChatMessage[data-testid="stChatMessage-User"] {
+    background-color: rgba(185, 146, 47, 0.12);
+    border-radius: 12px;
+    padding: 0.75rem;
 }
 
-/* Chat bubbles */
-.chat-bubble {
-    padding: 1rem 1.2rem;
-    border-radius: 18px;
-    margin-bottom: 0.9rem;
-    line-height: 1.6;
-    word-wrap: break-word;
-    box-shadow: 0px 2px 8px rgba(0,0,0,0.10);
+.stChatMessage[data-testid="stChatMessage-Assistant"] {
+    background-color: #fff9f3;
+    border: 1px solid #e6d6c4;
+    border-radius: 12px;
+    padding: 0.9rem;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.08);
 }
 
-/* USER (gold → deeper bronze) */
-.chat-bubble.user {
-    background-color: #b9922f;       /* richer bronze-gold */
-    color: #fffdf5;                  /* off-white text for contrast */
-    margin-left: 20%;
-    border-top-right-radius: 6px;
+.stChatMessage .stMarkdown p {
+    color: #2a1e12 !important;
 }
 
-/* ASSISTANT (soft cream) */
-.chat-bubble.assistant {
-    background-color: #fffaf0;       /* light warm cream */
-    color: #141414;                  /* deep black-brown text */
-    margin-right: 20%;
-    border-top-left-radius: 6px;
-    border: 1px solid #e0dac3;
-    line-height: 1.7;
+.stChatInput textarea,
+.stTextInput>div>div>input {
+    background-color: #fff8ef !important;
+    color: #1b1b1b !important;
 }
 
-/* Feedback buttons */
-.feedback-buttons button {
-    margin-right: 0.5rem;
-    background-color: #2c2c2c !important;
-    color: #ffffff !important;
-    border-radius: 8px !important;
-    font-size: 0.9rem !important;
-}
-.feedback-buttons button:hover {
-    background-color: #d4af37 !important;
-    color: #0c0c0c !important;
+.stChatInput textarea::placeholder {
+    color: #a38c74 !important;
 }
 
-/* “Context used” + warnings */
 .stAlert, [data-testid="stNotification"] {
-    background-color: #fffaf0 !important;
-    color: #111111 !important;
+    background-color: #fff1e0 !important;
+    color: #3b2e1e !important;
+    border-radius: 10px !important;
 }
 
-/* Ensure chat messages use dark text for readability */
-.stChatMessage .stMarkdown,
-.stChatMessage p,
-.stChatMessage li,
-.stChatMessage span,
-.stChatMessage pre,
-.stChatMessage code {
-    color: #000000 !important;
+.stButton>button {
+    border-radius: 6px !important;
+    background-color: #ece3d6 !important;
+    color: #2b2118 !important;
+    font-weight: 600 !important;
+    border: none !important;
 }
 
+.stButton>button:hover {
+    background-color: #e3d3bd !important;
+}
 
-/* Responsive */
+.feedback-wrapper {
+    margin-top: 0.75rem;
+}
+
+.feedback-wrapper p {
+    margin-bottom: 0.4rem;
+    font-weight: 600;
+    color: #3b2e1e;
+}
+
 @media (max-width: 768px) {
     body {
         background-color: #f3eddd;
     }
-    .chat-bubble.user, .chat-bubble.assistant {
+    .stChatMessage[data-testid="stChatMessage-User"],
+    .stChatMessage[data-testid="stChatMessage-Assistant"] {
         margin: 0.3rem 0;
     }
 }
@@ -258,38 +282,6 @@ header {
 RETRIEVAL_UNAVAILABLE_MSG = (
     "The retrieval system is temporarily unavailable. Please check your setup or try again later."
 )
-
-
-def ensure_feedback_log() -> Path:
-    feedback_dir = Path("data") / "feedback"
-    feedback_dir.mkdir(parents=True, exist_ok=True)
-    return feedback_dir / "feedback_log.json"
-
-
-def append_feedback(entry: Dict[str, Any]) -> None:
-    log_path = ensure_feedback_log()
-    if log_path.exists():
-        with log_path.open("r", encoding="utf-8") as log_file:
-            try:
-                feedback_data = json.load(log_file)
-            except json.JSONDecodeError:
-                feedback_data = []
-    else:
-        feedback_data = []
-
-    sanitized_entry = {
-        "question": sanitize_text(entry.get("question")),
-        "answer": sanitize_text(entry.get("answer")),
-        "timestamp": entry.get("timestamp"),
-        "feedback": sanitize_text(entry.get("feedback")),
-        "user_id": get_current_user(),
-    }
-
-    feedback_data.append(sanitized_entry)
-    with log_path.open("w", encoding="utf-8") as log_file:
-        json.dump(feedback_data, log_file, ensure_ascii=True, indent=2)
-
-    st.session_state.feedback_log.append(sanitized_entry)
 
 
 def render_header() -> None:
@@ -352,33 +344,30 @@ def display_chat_history() -> None:
                 for warning in warnings:
                     st.caption(f"⚠️ {warning}")
 
+            feedback_container = st.container()
+            with feedback_container:
+                st.markdown("<div class='feedback-wrapper'><p>Was this answer helpful?</p></div>", unsafe_allow_html=True)
             col1, col2 = st.columns([1, 1], gap="small")
             with col1:
                 if st.button(
                     "👍", key=f"feedback_pos_{idx}", use_container_width=True
                 ):
-                    append_feedback(
-                        {
-                            "question": message.get("question", ""),
-                            "answer": message["content"],
-                            "timestamp": datetime.now(timezone.utc).isoformat(),
-                            "feedback": "positive",
-                        }
+                    record_feedback(
+                        "positive",
+                        message.get("question", ""),
+                        message["content"],
                     )
-                    st.toast("Thank you for the feedback!", icon="✅")
+                    st.toast("Thank you for your feedback!", icon="✅")
             with col2:
                 if st.button(
                     "👎", key=f"feedback_neg_{idx}", use_container_width=True
                 ):
-                    append_feedback(
-                        {
-                            "question": message.get("question", ""),
-                            "answer": message["content"],
-                            "timestamp": datetime.now(timezone.utc).isoformat(),
-                            "feedback": "negative",
-                        }
+                    record_feedback(
+                        "negative",
+                        message.get("question", ""),
+                        message["content"],
                     )
-                    st.toast("Feedback recorded.", icon="✍️")
+                    st.toast("Feedback recorded for review.", icon="✍️")
 
     st.markdown(
         "<script>window.scrollTo(0, document.body.scrollHeight);</script>",
@@ -499,8 +488,8 @@ def process_input(user_input_raw: str) -> None:
         assistant_message = handle_question(user_input)
     except Exception as exc:
         st.session_state.last_question = None
-        st.error("⚠️ Something went wrong while generating a response. Please try again.")
-        print(f"Internal error: {exc}")
+        logging.exception("Error while generating response: %s", exc)
+        show_grace_message()
         return
 
     st.session_state.chat_history.append(
@@ -554,6 +543,6 @@ def run_chat_interface() -> None:
 try:
     run_chat_interface()
 except Exception as exc:
-    st.error("⚠️ Something went wrong while generating a response. Please try again.")
-    print(f"Internal error: {exc}")
+    logging.exception("Unhandled error in interface: %s", exc)
+    show_grace_message()
     st.stop()

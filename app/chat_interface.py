@@ -9,6 +9,7 @@ from __future__ import annotations
 # Developer toggle: st.session_state["developer_mode"] = True to show tonal metrics
 # TODO: Future Phase — Convert this Streamlit prototype into a FastAPI backend with REST endpoints for /query and /review.
 
+import itertools
 import json
 import logging
 import os
@@ -17,7 +18,7 @@ import sys
 from datetime import datetime, timezone
 import time
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from dotenv import load_dotenv
 from openai import OpenAI
@@ -108,6 +109,16 @@ def show_grace_message() -> None:
     st.warning(f"🙏 {message}\n\n**{verse}**")
 
 
+LOADING_VERSES = itertools.cycle(
+    [
+        "Be still, and know that I am God. — Psalm 46:10",
+        "The Lord is my light and my salvation. — Psalm 27:1",
+        "Those who hope in the Lord will renew their strength. — Isaiah 40:31",
+        "The Lord is faithful to all His promises. — Psalm 145:13",
+    ]
+)
+
+
 def record_feedback(rating: str, question: str, answer: str) -> None:
     entry = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -118,6 +129,34 @@ def record_feedback(rating: str, question: str, answer: str) -> None:
     FEEDBACK_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
     with FEEDBACK_LOG_PATH.open("a", encoding="utf-8") as handle:
         handle.write(json.dumps(entry, ensure_ascii=True) + "\n")
+
+
+def synthesize_with_gpt(question: str, context: str) -> Optional[str]:
+    try:
+        completion = client.chat.completions.create(
+            model=os.getenv("OPENAI_COMPLETIONS_MODEL", "gpt-4o-mini"),
+            temperature=0.4,
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are a faithful WELS-aligned theological assistant."
+                },
+                {
+                    "role": "user",
+                    "content": f"Question: {question}\n\nContext:\n{context}",
+                },
+            ],
+        )
+    except Exception as exc:
+        logging.exception("Synthesis error: %s", exc)
+        show_grace_message()
+        return None
+
+    choice = completion.choices[0].message
+    answer_text = getattr(choice, "content", None)
+    if not answer_text:
+        return None
+    return answer_text.strip()
 
 def enforce_access_code(state_key: str, prompt_label: str = "Access code") -> None:
     if not SETTINGS.get("access_control", True):
@@ -157,9 +196,11 @@ def enforce_access_code(state_key: str, prompt_label: str = "Access code") -> No
 try:
     from scripts.query_rag import (  # noqa: E402
         format_truncated_answer,
-        query_with_gpt,
         retrieve_contextual_sources,
         retrieve_doctrinal_sources,
+        build_doctrinal_context,
+        build_contextual_context,
+        evaluate_tone,
     )
 except Exception as exc:
     logging.exception("Failed to import retrieval utilities: %s", exc)
@@ -385,13 +426,17 @@ def display_chat_history() -> None:
                 for warning in warnings:
                     st.caption(f"⚠️ {warning}")
 
+            st.markdown("---")
             feedback_container = st.container()
             with feedback_container:
-                st.markdown("<div class='feedback-wrapper'><p>Was this answer helpful?</p></div>", unsafe_allow_html=True)
+                st.markdown(
+                    "<div class='feedback-wrapper'><p>How helpful was this answer?</p></div>",
+                    unsafe_allow_html=True,
+                )
             col1, col2 = st.columns([1, 1], gap="small")
             with col1:
                 if st.button(
-                    "👍", key=f"feedback_pos_{idx}", use_container_width=True
+                    "👍 Helpful", key=f"feedback_pos_{idx}", use_container_width=True
                 ):
                     record_feedback(
                         "positive",
@@ -401,7 +446,7 @@ def display_chat_history() -> None:
                     st.toast("Thank you for your feedback!", icon="✅")
             with col2:
                 if st.button(
-                    "👎", key=f"feedback_neg_{idx}", use_container_width=True
+                    "👎 Needs Review", key=f"feedback_neg_{idx}", use_container_width=True
                 ):
                     record_feedback(
                         "negative",
@@ -416,80 +461,66 @@ def display_chat_history() -> None:
     )
 
 
+def _fallback_from_retrieval(
+    doctrine_sources: List[Dict[str, Any]],
+    contextual_sources: List[Dict[str, Any]],
+) -> str:
+    if not doctrine_sources and not contextual_sources:
+        return "Faithful resources are still being gathered for this topic. Please check back soon."
+
+    lines: List[str] = ["Here are some related teachings:"]
+    for item in doctrine_sources:
+        lines.append(
+            f"- **{item.get('question', 'N/A')}** (score {item.get('score', 0):.2f})"
+        )
+    if contextual_sources:
+        lines.append("")
+        lines.append("Related WELS resources:")
+        for item in contextual_sources:
+            lines.append(
+                f"- **{item.get('title', 'N/A')}** (score {item.get('score', 0):.2f})"
+            )
+    return "\n".join(lines)
+
+
 def handle_question(question: str) -> Dict[str, Any]:
     try:
         doctrine_sources = retrieve_doctrinal_sources(question, top_k=3)
-    except (FileNotFoundError, ValueError):
-        return {
-            "role": "assistant",
-            "content": RETRIEVAL_UNAVAILABLE_MSG,
-            "sources": {"doctrine": [], "contextual": [], "warnings": []},
-            "question": question,
-        }
+    except (FileNotFoundError, ValueError) as exc:
+        logging.exception("Doctrinal retrieval failed: %s", exc)
+        doctrine_sources = []
 
     warnings: List[str] = []
     try:
         contextual_sources = retrieve_contextual_sources(question, top_k=2)
     except (FileNotFoundError, ValueError) as exc:
+        logging.exception("Contextual retrieval failed: %s", exc)
         contextual_sources = []
-        warnings.append(
-            "Contextual sources unavailable. Using core doctrine only."
+        warnings.append("Contextual sources unavailable. Using core doctrine only.")
+
+    context_sections: List[str] = []
+    if doctrine_sources:
+        context_sections.append(build_doctrinal_context(doctrine_sources))
+    if contextual_sources:
+        context_sections.append(build_contextual_context(contextual_sources))
+
+    if not context_sections:
+        warnings.append("No doctrinal context found; providing faithful synthesis.")
+        context_for_llm = (
+            "Provide a biblically faithful, WELS-aligned response that "
+            "draws on Scripture, the Lutheran Confessions, and historic church teaching."
         )
+    else:
+        context_for_llm = "\n\n".join(context_sections)
 
-    if not doctrine_sources:
-        return {
-            "role": "assistant",
-            "content": (
-                "I could not find doctrinal guidance for that question yet. "
-                "Please try another phrasing."
-            ),
-            "sources": {
-                "doctrine": [],
-                "contextual": contextual_sources,
-                "warnings": warnings,
-            },
-            "question": question,
-        }
+    with st.spinner(next(LOADING_VERSES)):
+        answer = synthesize_with_gpt(question, context_for_llm)
 
-    result = query_with_gpt(
-        question,
-        doctrine_entries=doctrine_sources,
-        contextual_entries=contextual_sources,
-    )
+    if answer is None:
+        warnings.append("Synthesis service unavailable; sharing retrieved teachings instead.")
+        answer = _fallback_from_retrieval(doctrine_sources, contextual_sources)
 
-    answer = result.get("answer") or ""
-    warnings.extend(result.get("warnings", []))
-    tone_score = result.get("tone_score")
-    doctrine_sources = result.get("doctrine", doctrine_sources)
-    contextual_sources = result.get("contextual", contextual_sources)
-
-    synthesis_unavailable = any(
-        answer.startswith(prefix)
-        for prefix in (
-            "OPENAI_API_KEY",
-            "The 'openai' package",
-            "OpenAI API error",
-            "No context available",
-        )
-    )
-
-    if synthesis_unavailable:
-        warnings.append("Unable to reach the synthesis service right now.")
-        lines: List[str] = ["Here are some related teachings:"]
-        for item in doctrine_sources:
-            lines.append(
-                f"- **{item.get('question', 'N/A')}** "
-                f"(score {item.get('score', 0):.2f})"
-            )
-        if contextual_sources:
-            lines.append("")
-            lines.append("Related WELS resources:")
-            for item in contextual_sources:
-                lines.append(
-                    f"- **{item.get('title', 'N/A')}** "
-                    f"(score {item.get('score', 0):.2f})"
-        )
-        answer = "\n".join(lines)
+    tone_score = evaluate_tone(answer)
 
     return {
         "role": "assistant",

@@ -67,7 +67,7 @@ DEFAULT_GPT_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o")
 logger = logging.getLogger(__name__)
 
 _QA_CACHE: Optional[Tuple[faiss.Index, List[dict]]] = None
-_CONTEXT_CACHE: Optional[Tuple[faiss.Index, List[dict]]] = None
+_CONTEXT_CACHE: Optional[Tuple[Optional[faiss.Index], List[dict]]] = None
 _MODEL_CACHE: Optional[SentenceTransformer] = None
 
 LOG_DIR = PROJECT_ROOT / "logs"
@@ -116,12 +116,16 @@ def get_cached_doctrine_index() -> Tuple[faiss.Index, List[dict]]:
     return _QA_CACHE
 
 
-def get_cached_context_index() -> Tuple[faiss.Index, List[dict]]:
+def get_cached_context_index() -> Tuple[Optional[faiss.Index], List[dict]]:
     global _CONTEXT_CACHE
     if _CONTEXT_CACHE is None:
-        _CONTEXT_CACHE = _load_index_and_metadata(
-            CONTEXT_INDEX_PATH, CONTEXT_METADATA_PATH, "contextual"
-        )
+        try:
+            _CONTEXT_CACHE = _load_index_and_metadata(
+                CONTEXT_INDEX_PATH, CONTEXT_METADATA_PATH, "contextual"
+            )
+        except FileNotFoundError as exc:
+            logger.warning("Contextual index unavailable: %s", exc)
+            _CONTEXT_CACHE = (None, [])
     return _CONTEXT_CACHE
 
 
@@ -145,7 +149,9 @@ def retrieve_similar(
     return scores[0], indices[0]
 
 
-def format_truncated_answer(answer: str, limit: int = 400) -> str:
+def format_truncated_answer(answer: Optional[str], limit: int = 400) -> str:
+    if not answer:
+        return ""
     if len(answer) <= limit:
         return answer
     return answer[: limit - 3] + "..."
@@ -267,6 +273,8 @@ def retrieve_doctrinal_sources(question: str, top_k: int = 3) -> List[Dict[str, 
 
 def retrieve_contextual_sources(question: str, top_k: int = 2) -> List[Dict[str, object]]:
     index, metadata = get_cached_context_index()
+    if index is None or not metadata:
+        return []
     model = get_embedding_model()
     scores, indices = retrieve_similar(question, model, index, top_k=top_k)
 

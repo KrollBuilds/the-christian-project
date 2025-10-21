@@ -6,21 +6,17 @@ from __future__ import annotations
 # TODO: move logs to encrypted storage (e.g., Supabase or Firestore)
 # TODO: implement admin metrics dashboard for usage and cost
 
-import sys, os
+from pathlib import Path
+import sys
 
-# Get absolute path to the project root (one level above the /app directory)
-project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-
-# Add project root to Python path
-if project_root not in sys.path:
-    sys.path.insert(0, project_root)
-
-print("PYTHONPATH:", sys.path[:3])
+# Ensure the project root is on the Python path so package imports resolve.
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
 import json
 from collections import defaultdict
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any, DefaultDict, Dict, List, Optional
 
 from dotenv import load_dotenv

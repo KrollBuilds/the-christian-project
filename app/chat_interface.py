@@ -30,8 +30,36 @@ if PROJECT_ROOT not in sys.path:
 
 import streamlit as st  # noqa: E402  (import after sys.path adjustment)
 
-from app.auth_utils import get_current_user
-from app.privacy_utils import sanitize_text
+try:
+    from .auth_utils import get_current_user  # type: ignore
+except Exception:
+    try:
+        from app.auth_utils import get_current_user  # type: ignore
+    except Exception:
+        logging.warning("auth_utils not found; using fallback get_current_user returning None.")
+        def get_current_user():
+            return None
+
+# Try importing privacy utils with the same resilient pattern as auth_utils.
+# If unavailable, provide a conservative fallback sanitizer that strips common PII patterns.
+try:
+    from .privacy_utils import sanitize_text  # type: ignore
+except Exception:
+    try:
+        from app.privacy_utils import sanitize_text  # type: ignore
+    except Exception:
+        logging.warning("privacy_utils not found; using fallback sanitize_text that strips PII.")
+        import re
+        def sanitize_text(text: str) -> str:
+            if not isinstance(text, str):
+                return ""
+            # remove email addresses
+            text = re.sub(r"\b[\w.%+-]+@[\w.-]+\.[a-zA-Z]{2,}\b", "[redacted email]", text)
+            # remove phone-like number sequences
+            text = re.sub(r"\b(?:\+?\d{1,3}[-.\s]?)?(?:\(?\d{3}\)?[-.\s]?){1,2}\d{4}\b", "[redacted phone]", text)
+            # trim and return
+            return text.strip()
+
 from config import SETTINGS
 
 load_dotenv()
@@ -74,6 +102,7 @@ for path in DATA_PATHS:
     path.mkdir(parents=True, exist_ok=True)
 
 FEEDBACK_LOG_PATH = Path("data/metrics/feedback_log.jsonl")
+REVIEW_QUEUE_PATH = Path(os.getenv("REVIEW_QUEUE_PATH", "data/metrics/review_queue.jsonl"))
 
 # To set key locally: echo "OPENAI_API_KEY=yourkey" > .env
 # For deployment: add OPENAI_API_KEY as an environment variable in the hosting platform.
@@ -129,6 +158,48 @@ def record_feedback(rating: str, question: str, answer: str) -> None:
     FEEDBACK_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
     with FEEDBACK_LOG_PATH.open("a", encoding="utf-8") as handle:
         handle.write(json.dumps(entry, ensure_ascii=True) + "\n")
+
+
+def push_for_pastoral_review(question: str, assistant_payload: Dict[str, Any]) -> None:
+    """Append the latest exchange to the shared review queue."""
+    answer_text = assistant_payload.get("content")
+    if not answer_text:
+        return
+
+    sources = assistant_payload.get("sources") or {}
+    doctrine_sources = sources.get("doctrine") or []
+    primary_topic = "general"
+    for item in doctrine_sources:
+        if not isinstance(item, dict):
+            continue
+        candidate = item.get("topic_cluster") or item.get("topic") or item.get("category")
+        if candidate:
+            primary_topic = str(candidate)
+            break
+
+    tone_score = sources.get("tone_score")
+    response_id = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S%f")
+
+    entry: Dict[str, Any] = {
+        "response_id": response_id,
+        "question": sanitize_text(question),
+        "answer": sanitize_text(answer_text),
+        "topic_cluster": sanitize_text(primary_topic),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+    if tone_score is not None:
+        entry["tone_score"] = tone_score
+
+    reviewer = get_current_user()
+    if reviewer:
+        entry["submitted_by"] = sanitize_text(reviewer)
+
+    REVIEW_QUEUE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        with REVIEW_QUEUE_PATH.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(entry, ensure_ascii=True) + "\n")
+    except OSError as exc:
+        logging.exception("Unable to push response to review queue: %s", exc)
 
 
 def synthesize_with_gpt(question: str, context: str) -> Optional[str]:
@@ -568,11 +639,12 @@ def process_input(user_input_raw: str) -> None:
         {"role": "user", "content": user_input, "question": user_input}
     )
     st.session_state.chat_history.append(assistant_message)
+    push_for_pastoral_review(user_input, assistant_message)
     st.toast("✅ Response generated", icon="✨")
 
 
 # TODO: Add persistent user sessions with login
-# TODO: Integrate with review dashboard for automatic logging
+# Review dashboard integration handled via push_for_pastoral_review
 
 def run_chat_interface() -> None:
     render_header()

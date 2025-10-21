@@ -6,20 +6,37 @@ from __future__ import annotations
 # TODO: move logs to encrypted storage (e.g., Supabase or Firestore)
 # TODO: implement admin metrics dashboard for usage and cost
 
-import csv
+import sys, os
+
+# Get absolute path to the project root (one level above the /app directory)
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+# Add project root to Python path
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
+print("PYTHONPATH:", sys.path[:3])
+
 import json
-import os
 from collections import defaultdict
 from datetime import datetime, timezone
-from io import StringIO
 from pathlib import Path
-from typing import Any, DefaultDict, Dict, List, Optional, Tuple
+from typing import Any, DefaultDict, Dict, List, Optional
 
 from dotenv import load_dotenv
 import streamlit as st
 
 from app.auth_utils import get_current_user
 from app.privacy_utils import sanitize_text
+from app.reviewer_portal_utils import (
+    apply_portal_theme,
+    compute_response_id,
+    get_authorized_reviewer_set,
+    normalize_email,
+    require_reviewer_auth,
+)
+
+
 from config import SETTINGS
 
 load_dotenv()
@@ -35,143 +52,12 @@ for path in DATA_PATHS:
 
 DATA_DIR = Path("data") / "feedback"
 FEEDBACK_PATH = DATA_DIR / "feedback_log.json"
-REVIEW_LOG_PATH = DATA_DIR / "review_log.jsonl"
+METRICS_DIR = Path("data") / "metrics"
+REVIEW_LOG_PATH = METRICS_DIR / "pastor_feedback.jsonl"
 CONV_LOG_PATH = Path("logs") / "generation_log.jsonl"
 
-st.set_page_config(
-    page_title="Pastoral Review Dashboard",
-    page_icon="📖",
-    layout="wide",
-)
-def require_reviewer_auth() -> None:
-    """Password gate for the reviewer dashboard (separate from public chat)."""
-
-    secret = st.secrets.get("REVIEW_DASHBOARD_PASS") or os.getenv("DASHBOARD_PASSCODE")
-    if not secret:
-        st.error(
-            "🔒 Reviewer password not configured. Set REVIEW_DASHBOARD_PASS (or DASHBOARD_PASSCODE) in your environment."
-        )
-        st.stop()
-
-    if st.session_state.get("review_dashboard_authenticated"):
-        return
-
-    st.title("Pastoral Review Dashboard")
-    st.caption("Authorized reviewers only.")
-    password = st.text_input("Enter dashboard password:", type="password")
-    if st.button("Unlock dashboard"):
-        if password == secret:
-            st.session_state["review_dashboard_authenticated"] = True
-            st.experimental_rerun()
-        else:
-            st.error("Incorrect password. Please try again.")
-    st.stop()
-
-
+apply_portal_theme("Pastoral Review Dashboard")
 require_reviewer_auth()
-
-BACKGROUND_STYLE = """
-<style>
-body, .stApp {
-    background-color: #f7f4e9;
-    color: #222222;                    /* darker default text */
-    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
-}
-
-/* Headings and markdown text */
-h1, h2, h3, h4, h5, h6, p, label, span, div, .stMarkdown {
-    color: #222222 !important;
-}
-
-/* Streamlit form widgets */
-.stTextInput > div > div > input,
-.stTextArea > div > textarea,
-.stSelectbox div[data-baseweb="select"],
-.stRadio label,
-.stSlider label {
-    color: #222222 !important;
-    background-color: #fffef8 !important;
-}
-
-/* Radio and select option text */
-.stRadio div[role="radiogroup"] label,
-.stSelectbox div[role="option"] {
-    color: #222222 !important;
-}
-
-/* Sidebar adjustments */
-[data-testid="stSidebar"] {
-    background-color: #f7f4e9 !important;
-    color: #222222 !important;
-}
-
-/* Metric and review cards */
-.metric-card, .review-card {
-    background: #ffffff;
-    border-radius: 12px;
-    padding: 1rem;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-    margin-bottom: 0.75rem;
-    color: #222222;
-}
-
-/* Subtle accent for timestamps or muted text */
-.review-card .timestamp,
-.small-text,
-.stCaption {
-    color: #555555 !important;
-}
-
-/* Buttons */
-button[kind="primary"], .stButton>button {
-    background-color: #d4af37 !important;
-    color: #ffffff !important;
-    border-radius: 6px;
-}
-button[kind="secondary"], .stButton>button:hover {
-    background-color: #c29b30 !important;
-    color: #ffffff !important;
-}
-
-/* Ensure Streamlit textareas show dark text */
-textarea {
-    color: #222222 !important;
-    background-color: #fffef8 !important;
-}
-
-.review-card {
-    position: relative;
-    transition: box-shadow 0.2s ease-in-out;
-}
-
-.review-card:hover {
-    box-shadow: 0px 4px 12px rgba(0,0,0,0.12);
-}
-
-.review-card.review-card-sound {
-    background-color: #eaf7ea;
-}
-
-.review-card.review-card-incorrect {
-    background-color: #fdecea;
-}
-
-.review-card .reviewed-badge {
-    position: absolute;
-    top: 12px;
-    right: 12px;
-    background-color: #d4af37;
-    color: #ffffff;
-    padding: 3px 8px;
-    border-radius: 6px;
-    font-size: 0.8rem;
-}
-
-</style>
-"""
-
-
-st.markdown(BACKGROUND_STYLE, unsafe_allow_html=True)
 
 
 def load_feedback_entries() -> List[Dict[str, Any]]:
@@ -202,14 +88,22 @@ def load_feedback_entries() -> List[Dict[str, Any]]:
         answer = entry.get("answer") or entry.get("response")
         timestamp = entry.get("timestamp") or entry.get("datetime")
         tone_score = entry.get("tone_score")
+        topic_cluster = entry.get("topic_cluster") or entry.get("topic") or "General Theology"
+        response_id = (
+            entry.get("response_id")
+            or entry.get("id")
+            or compute_response_id(question or "", timestamp, answer or "")
+        )
         if not question or not answer:
             continue
         normalized.append(
             {
+                "response_id": response_id,
                 "question": question,
                 "answer": answer,
                 "timestamp": timestamp,
                 "tone_score": tone_score,
+                "topic_cluster": topic_cluster,
             }
         )
     normalized.sort(
@@ -234,93 +128,82 @@ def load_existing_reviews() -> List[Dict[str, Any]]:
     return reviews
 
 
-def record_review(review: Dict[str, Any]) -> None:
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
-    sanitized_review = {
-        "question": sanitize_text(review.get("question")),
-        "answer": sanitize_text(review.get("answer")),
-        "accuracy": sanitize_text(review.get("accuracy")),
-        "tone": sanitize_text(review.get("tone")),
-        "completeness": sanitize_text(review.get("completeness")),
-        "comments": sanitize_text(review.get("comments")) if review.get("comments") else None,
-        "reviewer": sanitize_text(review.get("reviewer")),
-        "timestamp": review.get("timestamp"),
+def persist_review_entry(log_entry: Dict[str, Any]) -> None:
+    sanitized_entry = {
+        "response_id": log_entry.get("response_id"),
+        "review_status": sanitize_text(log_entry.get("review_status")),
+        "pastor_score": log_entry.get("pastor_score"),
+        "pastor_notes": sanitize_text(log_entry.get("pastor_notes")) if log_entry.get("pastor_notes") else None,
+        "reviewer_id": sanitize_text(log_entry.get("reviewer_id")),
+        "reviewer_name": sanitize_text(log_entry.get("reviewer_name")),
+        "timestamp": log_entry.get("timestamp"),
+        "response_metadata": {
+            "question": sanitize_text(log_entry.get("question")),
+            "answer": sanitize_text(log_entry.get("answer")),
+            "topic_cluster": sanitize_text(log_entry.get("topic_cluster")),
+            "submitted": sanitize_text(log_entry.get("submitted")),
+        },
         "user_id": get_current_user(),
     }
-    with REVIEW_LOG_PATH.open("a", encoding="utf-8") as file:
-        file.write(json.dumps(sanitized_review, ensure_ascii=True) + "\n")
 
+    existing_lines: List[str] = []
+    if REVIEW_LOG_PATH.exists():
+        with REVIEW_LOG_PATH.open("r", encoding="utf-8") as infile:
+            for line in infile:
+                stripped = line.strip()
+                if not stripped:
+                    continue
+                try:
+                    record = json.loads(stripped)
+                except json.JSONDecodeError:
+                    continue
+                if (
+                    record.get("response_id") == sanitized_entry["response_id"]
+                    and record.get("reviewer_id") == sanitized_entry["reviewer_id"]
+                ):
+                    # Skip existing record for this reviewer/response combination (upsert behavior)
+                    continue
+                existing_lines.append(json.dumps(record, ensure_ascii=True))
 
-def delete_review_entry(question: str, answer: str, reviewer: str) -> bool:
-    if not REVIEW_LOG_PATH.exists():
-        return False
-
-    remaining_lines: List[str] = []
-    removed = False
-
-    target_question = sanitize_text(question)
-    target_answer = sanitize_text(answer)
-    target_reviewer = sanitize_text(reviewer)
-
-    with REVIEW_LOG_PATH.open("r", encoding="utf-8") as source:
-        for line in source:
-            stripped = line.strip()
-            if not stripped:
-                continue
-            try:
-                entry = json.loads(stripped)
-            except json.JSONDecodeError:
-                remaining_lines.append(stripped)
-                continue
-
-            matches_question = entry.get("question") == target_question
-            matches_answer = entry.get("answer") == target_answer
-            matches_reviewer = entry.get("reviewer") == target_reviewer
-
-            if matches_question and matches_answer and matches_reviewer:
-                removed = True
-                continue
-
-            remaining_lines.append(json.dumps(entry, ensure_ascii=True))
-
-    if removed:
-        with REVIEW_LOG_PATH.open("w", encoding="utf-8") as destination:
-            for line in remaining_lines:
-                destination.write(line + "\n")
-    return removed
+    existing_lines.append(json.dumps(sanitized_entry, ensure_ascii=True))
+    METRICS_DIR.mkdir(parents=True, exist_ok=True)
+    with REVIEW_LOG_PATH.open("w", encoding="utf-8") as outfile:
+        outfile.write("\n".join(existing_lines) + "\n")
 
 
 def display_metrics(reviews: List[Dict[str, Any]], entries: List[Dict[str, Any]]) -> None:
     reviewed_count = len(reviews)
-    sound_count = sum(1 for review in reviews if review.get("accuracy") == "Sound")
-
-    tone_scores = [entry.get("tone_score") for entry in entries if entry.get("tone_score") is not None]
-    avg_tone = sum(tone_scores) / len(tone_scores) if tone_scores else None
+    approved_count = sum(1 for review in reviews if review.get("review_status") == "approved")
+    flagged_count = sum(1 for review in reviews if review.get("review_status") == "flagged")
+    distinct_reviewers = {review.get("reviewer_id") for review in reviews if review.get("reviewer_id")}
+    available_responses = {entry.get("response_id") for entry in entries if entry.get("response_id")}
+    reviewed_responses = {review.get("response_id") for review in reviews if review.get("response_id")}
+    pending_responses = len(available_responses - reviewed_responses)
 
     col1, col2, col3 = st.columns(3)
     with col1:
-        st.metric("Responses Reviewed", reviewed_count)
+        st.metric("Total Reviews Logged", reviewed_count)
     with col2:
-        sound_pct = (sound_count / reviewed_count * 100) if reviewed_count else 0
-        st.metric("Doctrinally Sound", f"{sound_pct:.0f}%")
+        st.metric("Approved Responses", approved_count)
     with col3:
-        tone_display = f"{avg_tone:.2f}" if avg_tone is not None else "—"
-        st.metric("Average Tone Score", tone_display)
+        st.metric("Flagged Responses", flagged_count)
+
+    st.caption(
+        f"Active reviewers: {len(distinct_reviewers)} | Responses pending review: {pending_responses}"
+    )
 
 
 def filter_entries(
     entries: List[Dict[str, Any]],
-    review_index: DefaultDict[Tuple[str, str], List[Dict[str, Any]]],
+    review_index: DefaultDict[str, List[Dict[str, Any]]],
+    reviewer_id: str,
 ) -> List[Dict[str, Any]]:
-    st.sidebar.header("Filters")
+    st.sidebar.subheader("Filters")
 
-    date_range = st.sidebar.date_input("Date range", [])
-    tone_min = st.sidebar.slider("Tone score ≥", 0.0, 1.0, 0.0, 0.05)
-    search_term = st.sidebar.text_input("Search question text")
-    show_unrated = st.sidebar.checkbox("Show only unrated", value=False)
-    show_reviewed_only = st.sidebar.checkbox("Show only reviewed entries", value=False)
-
-    reviewed_keys = set(review_index.keys())
+    date_range = st.sidebar.date_input("Submitted date range", [])
+    tone_min = st.sidebar.slider("Minimum tone score", 0.0, 1.0, 0.0, 0.05)
+    search_term = st.sidebar.text_input("Search question or answer")
+    show_pending_only = st.sidebar.checkbox("Only show items I have not reviewed", value=True)
 
     def is_in_date_range(timestamp: Optional[str]) -> bool:
         if not date_range:
@@ -343,22 +226,22 @@ def filter_entries(
     for entry in entries:
         tone_score = entry.get("tone_score")
         question = entry.get("question", "")
+        answer = entry.get("answer", "")
         timestamp = entry.get("timestamp")
-        key = (
-            sanitize_text(entry.get("question")),
-            sanitize_text(entry.get("answer")),
-        )
+        response_id = entry.get("response_id")
 
         if tone_score is not None and tone_score < tone_min:
             continue
-        if search_term and search_term.lower() not in question.lower():
+        if search_term and search_term.lower() not in (question + " " + answer).lower():
             continue
         if not is_in_date_range(timestamp):
             continue
-        if show_unrated and key in reviewed_keys:
-            continue
-        if show_reviewed_only and key not in reviewed_keys:
-            continue
+        if show_pending_only:
+            reviewer_reviews = [
+                review for review in review_index.get(response_id, []) if review.get("reviewer_id") == reviewer_id
+            ]
+            if reviewer_reviews:
+                continue
 
         filtered.append(entry)
     return filtered
@@ -366,217 +249,184 @@ def filter_entries(
 
 def build_review_index(
     reviews: List[Dict[str, Any]]
-) -> DefaultDict[Tuple[str, str], List[Dict[str, Any]]]:
-    index: DefaultDict[Tuple[str, str], List[Dict[str, Any]]] = defaultdict(list)
+) -> DefaultDict[str, List[Dict[str, Any]]]:
+    index: DefaultDict[str, List[Dict[str, Any]]] = defaultdict(list)
     for review in reviews:
-        question = review.get("question")
-        answer = review.get("answer")
-        if question and answer:
-            index[
-                (sanitize_text(question), sanitize_text(answer))
-            ].append(review)
+        response_id = review.get("response_id")
+        if response_id:
+            index[response_id].append(review)
     return index
-
-
-def generate_review_csv(reviews: List[Dict[str, Any]]) -> bytes:
-    fieldnames = [
-        "question",
-        "answer",
-        "accuracy",
-        "tone",
-        "completeness",
-        "reviewer",
-        "timestamp",
-    ]
-    buffer = StringIO()
-    writer = csv.DictWriter(buffer, fieldnames=fieldnames)
-    writer.writeheader()
-    for review in reviews:
-        writer.writerow({field: review.get(field, "") or "" for field in fieldnames})
-    return buffer.getvalue().encode("utf-8")
 
 
 def review_card(
     entry: Dict[str, Any],
+    reviewer_id: str,
     reviewer_name: str,
-    review_index: DefaultDict[Tuple[str, str], List[Dict[str, Any]]],
+    review_index: DefaultDict[str, List[Dict[str, Any]]],
 ) -> None:
-    question = entry.get("question", "")
-    answer = entry.get("answer", "")
+    question = entry.get("question", "").strip()
+    answer = entry.get("answer", "").strip()
     timestamp = entry.get("timestamp")
     tone_score = entry.get("tone_score")
+    topic_cluster = entry.get("topic_cluster")
+    response_id = entry.get("response_id")
     readable_time = timestamp or "Unknown timestamp"
-    key = (sanitize_text(question), sanitize_text(answer))
 
-    existing_reviews = review_index.get(key, [])
+    existing_reviews = review_index.get(response_id, [])
     reviewer_review = next(
-        (item for item in existing_reviews if item.get("reviewer") == reviewer_name),
+        (item for item in existing_reviews if item.get("reviewer_id") == reviewer_id),
         None,
     )
-    highlight_review = reviewer_review or (existing_reviews[0] if existing_reviews else None)
-
     card_classes = ["review-card"]
-    if highlight_review:
-        accuracy_value = highlight_review.get("accuracy")
-        if accuracy_value == "Sound":
+    if reviewer_review:
+        if reviewer_review.get("review_status") == "approved":
             card_classes.append("review-card-sound")
-        elif accuracy_value == "Incorrect":
+        elif reviewer_review.get("review_status") == "flagged":
             card_classes.append("review-card-incorrect")
 
-    with st.container():
-        st.markdown(
-            f'<div class="{" ".join(card_classes)}">', unsafe_allow_html=True
-        )
+    with st.container(border=True):
+        st.markdown(f'<div class="{" ".join(card_classes)}">', unsafe_allow_html=True)
         if existing_reviews:
             st.markdown(
-                '<span class="reviewed-badge">✅ Reviewed</span>',
+                '<span class="reviewed-badge">Reviewed</span>',
                 unsafe_allow_html=True,
             )
 
-        if reviewer_review:
-            delete_state_key = f"delete_confirm_{hash((question, answer, reviewer_name))}"
-            if st.button(
-                "🗑️ Remove Review",
-                key=f"remove_{hash((question, answer, reviewer_name))}",
-            ):
-                st.session_state[delete_state_key] = True
-            if st.session_state.get(delete_state_key):
-                st.warning("This will permanently remove your review.")
-                if st.button(
-                    "Confirm Delete",
-                    key=f"confirm_delete_{hash((question, answer, reviewer_name))}",
-                ):
-                    try:
-                        removed = delete_review_entry(question, answer, reviewer_name)
-                    except OSError as exc:
-                        st.error(f"Failed to delete review: {exc}")
-                    else:
-                        if removed:
-                            st.session_state["delete_success"] = True
-                        else:
-                            st.warning("No matching review found to delete.")
-                        st.session_state.pop(delete_state_key, None)
-                        st.experimental_rerun()
-
-        st.markdown(f"### Question\n{question}")
-        st.markdown(f"### Response\n{answer}")
-        meta_parts = [f"🕓 {readable_time}"]
+        st.subheader(f"Question: {question}")
+        st.markdown(f"**AI Response:** {answer}")
+        metadata_text = f"Topic Cluster: {topic_cluster}"
         if tone_score is not None:
-            meta_parts.append(f"🎚️ Tone score: {tone_score}")
-        st.markdown(" | ".join(meta_parts))
+            metadata_text += f" | Tone Score: {tone_score:.2f}"
+        metadata_text += f" | Submitted: {readable_time}"
+        st.caption(metadata_text)
 
-        accuracy_options = ["Sound", "Needs Review", "Incorrect"]
-        tone_options = ["Pastoral", "Neutral", "Off-tone"]
-        completeness_options = ["Complete", "Partial"]
+        expander_label = "Add Theological Notes"
+        default_notes = reviewer_review.get("pastor_notes") if reviewer_review else ""
+        with st.expander(expander_label, expanded=bool(default_notes)):
+            notes_key = f"notes_{response_id}"
+            pastor_notes = st.text_area(
+                "Notes or Scriptural reference",
+                value=default_notes or "",
+                key=notes_key,
+            )
 
-        accuracy_index = (
-            accuracy_options.index(reviewer_review.get("accuracy"))
-            if reviewer_review and reviewer_review.get("accuracy") in accuracy_options
-            else 0
-        )
-        tone_index = (
-            tone_options.index(reviewer_review.get("tone"))
-            if reviewer_review and reviewer_review.get("tone") in tone_options
-            else 0
-        )
-        completeness_index = (
-            completeness_options.index(reviewer_review.get("completeness"))
-            if reviewer_review
-            and reviewer_review.get("completeness") in completeness_options
-            else 0
-        )
-
-        accuracy = st.radio(
-            "Accuracy",
-            options=accuracy_options,
-            index=accuracy_index,
-            format_func=lambda choice: {
-                "Sound": "✅ Sound",
-                "Needs Review": "⚠️ Needs Review",
-                "Incorrect": "❌ Incorrect",
-            }[choice],
-            key=f"accuracy_{readable_time}_{question}",
-        )
-        tone = st.radio(
-            "Tone",
-            options=tone_options,
-            index=tone_index,
-            format_func=lambda choice: {
-                "Pastoral": "🙏 Pastoral",
-                "Neutral": "😐 Neutral",
-                "Off-tone": "⚠️ Off-tone",
-            }[choice],
-            key=f"tone_{readable_time}_{question}",
-        )
-        completeness = st.radio(
-            "Completeness",
-            options=completeness_options,
-            index=completeness_index,
-            format_func=lambda choice: {
-                "Complete": "📖 Complete",
-                "Partial": "✂️ Partial",
-            }[choice],
-            key=f"completeness_{readable_time}_{question}",
-        )
-
-        comments = st.text_area(
-            "Add reviewer notes (optional)",
-            (reviewer_review.get("comments") or "") if reviewer_review else "",
-            key=f"comments_{readable_time}_{question}",
-        )
-
-        if st.button("Save Review", key=f"save_{readable_time}_{question}"):
-            review_entry = {
+        def submit_review(status: str, score: int) -> None:
+            log_entry = {
+                "response_id": response_id,
+                "review_status": status,
+                "pastor_score": score,
+                "pastor_notes": pastor_notes.strip() or None,
+                "reviewer_id": reviewer_id,
+                "reviewer_name": reviewer_name,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
                 "question": question,
                 "answer": answer,
-                "accuracy": accuracy,
-                "tone": tone,
-                "completeness": completeness,
-                "comments": comments.strip() or None,
-                "reviewer": reviewer_name,
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "topic_cluster": topic_cluster,
+                "submitted": readable_time,
             }
-            record_review(review_entry)
-            st.session_state["save_success"] = True
-            # TODO: Archive deleted reviews and sync live with the training dataset builder.
+            try:
+                persist_review_entry(log_entry)
+            except OSError as exc:
+                st.error(f"Unable to record the review: {exc}")
+                return
+            st.session_state["review_saved"] = {
+                "response_id": response_id,
+                "status": status,
+            }
             st.experimental_rerun()
+
+        disable_actions = reviewer_id == "" or reviewer_name == ""
+        col1, col2 = st.columns([1, 1])
+        with col1:
+            st.button(
+                "Approve",
+                key=f"approve_{response_id}",
+                help="Mark this response as doctrinally sound.",
+                on_click=lambda: submit_review("approved", 1),
+                type="primary",
+                disabled=disable_actions,
+            )
+        with col2:
+            st.button(
+                "Flag for Revision",
+                key=f"flag_{response_id}",
+                help="Request doctrinal or pastoral revisions.",
+                on_click=lambda: submit_review("flagged", -1),
+                type="secondary",
+                disabled=disable_actions,
+            )
+
+        if existing_reviews:
+            st.markdown("---")
+            st.markdown("**Recorded Reviews**")
+            for review in existing_reviews:
+                reviewer_label = review.get("reviewer_name") or review.get("reviewer_id") or "Unknown Reviewer"
+                status_label = review.get("review_status", "unknown").capitalize()
+                review_time = review.get("timestamp", "Unknown timestamp")
+                notes = review.get("pastor_notes")
+                st.caption(f"{reviewer_label} • {status_label} • {review_time}")
+                if notes:
+                    st.markdown(f"> {notes}")
         st.markdown("</div>", unsafe_allow_html=True)
 
 
 def main() -> None:
-    st.title("📖 Pastoral Review Dashboard")
-    st.caption("Evaluate responses for theological accuracy, clarity, and tone.")
+    st.title("Pastoral Review Dashboard")
+    st.caption("Evaluate AI-generated responses, document doctrinal findings, and maintain an auditable record.")
 
-    reviewer_name = st.sidebar.text_input("Reviewer name", "")
-    if not reviewer_name:
-        st.warning("Please enter your name to record reviews.")
+    authorized_reviewers = get_authorized_reviewer_set()
+
+    with st.sidebar:
+        st.title("Reviewer Panel")
+        st.markdown("### Navigation")
+        st.page_link("review_dashboard.py", label="Pending Reviews")
+        st.page_link("review_history.py", label="My Review History")
+        st.page_link("metrics_overview.py", label="Feedback Metrics")
+
+        st.markdown("### Reviewer Details")
+        reviewer_email_input = st.text_input("Reviewer email")
+        reviewer_name_input = st.text_input("Display name")
+
+    reviewer_email = normalize_email(reviewer_email_input) if reviewer_email_input else ""
+    reviewer_name = reviewer_name_input.strip()
+
+    if authorized_reviewers is not None:
+        if not reviewer_email:
+            st.info("Enter an authorized reviewer email to begin.")
+            return
+        if reviewer_email not in authorized_reviewers:
+            st.error("This reviewer email is not authorized. Contact the administrator to request access.")
+            return
+
+    if not reviewer_email:
+        st.info("Enter your reviewer email to begin.")
         return
 
-    if st.session_state.pop("save_success", False):
-        st.success("✅ Review saved!")
-    if st.session_state.pop("delete_success", False):
-        st.success("Review deleted")
+    if not reviewer_name:
+        st.info("Provide your display name so your reviews can be attributed.")
+        return
+
+    saved_state = st.session_state.pop("review_saved", None)
+    if saved_state:
+        status = saved_state.get("status")
+        if status == "approved":
+            st.success("Review recorded as approved.")
+        elif status == "flagged":
+            st.warning("Review recorded as flagged for revision.")
 
     entries = load_feedback_entries()
     reviews = load_existing_reviews()
     review_index = build_review_index(reviews)
 
-    with st.expander("Summary", expanded=True):
+    with st.expander("Review Activity Summary", expanded=True):
         display_metrics(reviews, entries)
-        if reviews:
-            st.download_button(
-                "⬇️ Download review summary",
-                data=generate_review_csv(reviews),
-                file_name="review_export.csv",
-                mime="text/csv",
-            )
 
-    filtered_entries = filter_entries(entries, review_index)
+    filtered_entries = filter_entries(entries, review_index, reviewer_email)
 
     def show_privacy_caption() -> None:
         if SETTINGS.get("privacy_disclaimer", True):
             st.caption(
-                "⚠️ Do not share personal or identifying information. Conversations are logged anonymously for quality improvement."
+                "Please refrain from sharing personal or identifying details. Conversations are logged anonymously for quality improvement."
             )
 
     if not filtered_entries:
@@ -585,7 +435,7 @@ def main() -> None:
         return
 
     for entry in filtered_entries:
-        review_card(entry, reviewer_name, review_index)
+        review_card(entry, reviewer_email, reviewer_name, review_index)
 
     show_privacy_caption()
 

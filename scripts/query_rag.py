@@ -27,12 +27,12 @@ if str(PROJECT_ROOT) not in sys.path:
 # ---------------------------------------------------------------------
 # Utility fallbacks (so the file works standalone)
 try:
-    from app.auth_utils import get_current_user
+    from app.auth_utils import get_current_user # type: ignore
 except Exception:
     def get_current_user() -> str: return "guest"
 
 try:
-    from app.privacy_utils import sanitize_text
+    from app.privacy_utils import sanitize_text # type: ignore
 except Exception:
     def sanitize_text(text: object) -> str:
         if text is None: return ""

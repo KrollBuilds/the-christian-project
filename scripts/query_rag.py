@@ -75,6 +75,15 @@ DEFAULT_GPT_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o")
 LOG_DIR = PROJECT_ROOT / "logs"
 LOG_FILE = LOG_DIR / "generation_log.jsonl"
 
+
+def format_truncated_answer(answer: Optional[str], limit: int = 400) -> str:
+    if not answer:
+        return ""
+    if len(answer) <= limit:
+        return answer
+    return answer[: limit - 3] + "..."
+
+
 # ---------------------------------------------------------------------
 # Index resolver
 def _resolve_doctrine_paths() -> Tuple[Path, Path, str]:
@@ -192,6 +201,13 @@ def retrieve_contextual_sources(question: str, top_k: int = 2) -> List[Dict[str,
         e["source_category"] = "context"
         results.append(e)
     return results
+
+
+def query_with_gpt(question: str, doctrine_k: int = 3, context_k: int = 2) -> Dict[str, List[Dict[str, object]]]:
+    doctrine_entries = retrieve_doctrinal_sources(question, top_k=doctrine_k)
+    context_entries = retrieve_contextual_sources(question, top_k=context_k)
+    return {"doctrine": doctrine_entries, "context": context_entries}
+
 
 # ---------------------------------------------------------------------
 # (Remaining synthesis + CLI code unchanged from your version)

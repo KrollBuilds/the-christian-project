@@ -216,7 +216,7 @@ def _submit_remote_review(entry: Dict[str, Any]) -> None:
 
     headers = {"Content-Type": "application/json"}
     if REVIEW_API_KEY:
-        headers["Authorization"] = f"Bearer {REVIEW_API_KEY}"  # simple bearer auth
+        headers["x-api-key"] = REVIEW_API_KEY  # align with review API authentication
 
     try:
         timeout = float(REVIEW_API_TIMEOUT)

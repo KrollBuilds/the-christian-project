@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from dotenv import load_dotenv
+import requests
 from openai import OpenAI
 
 # Ensure parent directory is on the Python path
@@ -103,6 +104,12 @@ for path in DATA_PATHS:
 
 FEEDBACK_LOG_PATH = Path("data/metrics/feedback_log.jsonl")
 REVIEW_QUEUE_PATH = Path(os.getenv("REVIEW_QUEUE_PATH", "data/metrics/review_queue.jsonl"))
+REVIEW_API_URL = os.getenv(
+    "REVIEW_API_URL",
+    "https://the-christian-review-dashboard-production.up.railway.app/api/submit_review",
+)
+REVIEW_API_KEY = os.getenv("REVIEW_API_KEY")
+REVIEW_API_TIMEOUT = os.getenv("REVIEW_API_TIMEOUT", "5")
 
 # To set key locally: echo "OPENAI_API_KEY=yourkey" > .env
 # For deployment: add OPENAI_API_KEY as an environment variable in the hosting platform.
@@ -200,6 +207,32 @@ def push_for_pastoral_review(question: str, assistant_payload: Dict[str, Any]) -
             handle.write(json.dumps(entry, ensure_ascii=True) + "\n")
     except OSError as exc:
         logging.exception("Unable to push response to review queue: %s", exc)
+    _submit_remote_review(entry)
+
+
+def _submit_remote_review(entry: Dict[str, Any]) -> None:
+    if not REVIEW_API_URL:
+        return
+
+    headers = {"Content-Type": "application/json"}
+    if REVIEW_API_KEY:
+        headers["Authorization"] = f"Bearer {REVIEW_API_KEY}"  # simple bearer auth
+
+    try:
+        timeout = float(REVIEW_API_TIMEOUT)
+    except (TypeError, ValueError):
+        timeout = 5.0
+
+    try:
+        response = requests.post(
+            REVIEW_API_URL,
+            json=entry,
+            headers=headers,
+            timeout=timeout,
+        )
+        response.raise_for_status()
+    except Exception as exc:
+        logging.warning("Unable to submit response to review dashboard: %s", exc)
 
 
 def synthesize_with_gpt(question: str, context: str) -> Optional[str]:

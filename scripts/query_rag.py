@@ -19,6 +19,11 @@ import faiss
 import numpy as np
 from sentence_transformers import SentenceTransformer
 
+try:
+    from openai import OpenAI
+except Exception:  # pragma: no cover - optional dependency
+    OpenAI = None  # type: ignore[assignment]
+
 # --- Project setup ---
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
@@ -82,6 +87,46 @@ def format_truncated_answer(answer: Optional[str], limit: int = 400) -> str:
     if len(answer) <= limit:
         return answer
     return answer[: limit - 3] + "..."
+
+
+PASTORAL_GUIDANCE_LINE = (
+    "If you have questions about this teaching or how it applies to your life, "
+    "please speak with your pastor or a trusted church leader for personal guidance."
+)
+_GUIDANCE_KEYWORD_RE = re.compile(r"(pastor|church leader)", re.IGNORECASE)
+_OPENAI_CLIENT: Optional["OpenAI"] = None
+
+
+def sanitize_output(text: Optional[str]) -> str:
+    if not text:
+        return ""
+    try:
+        cleaned = sanitize_text(text)
+    except Exception:
+        cleaned = str(text)
+    return cleaned.strip()
+
+
+def append_pastoral_guidance(text: str) -> str:
+    if not text:
+        return PASTORAL_GUIDANCE_LINE
+
+    clean = text.strip()
+    if not clean:
+        return PASTORAL_GUIDANCE_LINE
+
+    tail = clean[-200:]
+    if _GUIDANCE_KEYWORD_RE.search(tail):
+        return clean
+
+    while clean and clean[-1] in " \n\t":
+        clean = clean[:-1]
+    while clean and clean[-1] in ",;:":
+        clean = clean[:-1]
+        clean = clean.rstrip()
+    if clean and clean[-1] not in (".", "!", "?"):
+        clean += "."
+    return f"{clean}\n\n{PASTORAL_GUIDANCE_LINE}"
 
 
 # ---------------------------------------------------------------------
@@ -203,10 +248,37 @@ def retrieve_contextual_sources(question: str, top_k: int = 2) -> List[Dict[str,
     return results
 
 
-def query_with_gpt(question: str, doctrine_k: int = 3, context_k: int = 2) -> Dict[str, List[Dict[str, object]]]:
+def query_with_gpt(
+    question: str,
+    doctrine_k: int = 3,
+    context_k: int = 2,
+    *,
+    synthesize: bool = False,
+    model: Optional[str] = None,
+) -> Dict[str, object]:
     doctrine_entries = retrieve_doctrinal_sources(question, top_k=doctrine_k)
     context_entries = retrieve_contextual_sources(question, top_k=context_k)
-    return {"doctrine": doctrine_entries, "context": context_entries}
+    result: Dict[str, object] = {"doctrine": doctrine_entries, "context": context_entries}
+
+    if not synthesize:
+        return result
+
+    try:
+        answer = run_gpt_synthesis(
+            question,
+            doctrine_entries,
+            context_entries,
+            model=model,
+        )
+        result["answer"] = answer
+        result["fallback_used"] = False
+    except Exception as exc:
+        logger.exception("Synthesis failed; falling back to pastoral guidance: %s", exc)
+        fallback = append_pastoral_guidance(FALLBACK_PROMPT)
+        result["answer"] = fallback
+        result["fallback_used"] = True
+
+    return result
 
 
 def evaluate_tone(answer: Optional[str]) -> float:
@@ -227,6 +299,55 @@ def evaluate_tone(answer: Optional[str]) -> float:
             score -= 0.05
 
     return max(0.0, min(1.0, score))
+
+
+def _get_openai_client() -> "OpenAI":
+    if OpenAI is None:
+        raise RuntimeError("OpenAI SDK is not installed. Install the openai package to enable synthesis.")
+
+    global _OPENAI_CLIENT
+    if _OPENAI_CLIENT is None:
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            raise RuntimeError("OPENAI_API_KEY environment variable is not set.")
+        _OPENAI_CLIENT = OpenAI(api_key=api_key)
+    return _OPENAI_CLIENT
+
+
+def run_gpt_synthesis(
+    question: str,
+    doctrine_entries: List[Dict[str, object]],
+    context_entries: List[Dict[str, object]],
+    *,
+    model: Optional[str] = None,
+) -> str:
+    client = _get_openai_client()
+
+    doctrinal_context = build_doctrinal_context(doctrine_entries)
+    contextual_context = build_contextual_context(context_entries)
+
+    prompt = SYNTHESIS_PROMPT_TEMPLATE.format(
+        doctrinal_context=doctrinal_context,
+        contextual_context=contextual_context,
+        user_question=sanitize_text(question),
+    )
+
+    response = client.chat.completions.create(
+        model=model or DEFAULT_GPT_MODEL,
+        temperature=TEMPERATURE,
+        max_tokens=MAX_TOKENS,
+        messages=[
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": prompt},
+        ],
+    )
+
+    choices = getattr(response, "choices", None) or []
+    if not choices:
+        raise RuntimeError("No completion choices returned by the GPT model.")
+
+    content = getattr(choices[0].message, "content", None)
+    return append_pastoral_guidance(sanitize_output(content))
 
 
 # ---------------------------------------------------------------------

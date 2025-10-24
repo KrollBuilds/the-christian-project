@@ -227,7 +227,8 @@ def synthesize_with_gpt(question: str, context: str) -> Optional[str]:
     answer_text = getattr(choice, "content", None)
     if not answer_text:
         return None
-    return answer_text.strip()
+    sanitized = sanitize_text(answer_text).strip()
+    return append_pastoral_guidance(sanitized)
 
 def enforce_access_code(state_key: str, prompt_label: str = "Access code") -> None:
     if not SETTINGS.get("access_control", True):
@@ -266,6 +267,7 @@ def enforce_access_code(state_key: str, prompt_label: str = "Access code") -> No
 
 try:
     from scripts.query_rag import (  # noqa: E402
+        append_pastoral_guidance,
         format_truncated_answer,
         retrieve_contextual_sources,
         retrieve_doctrinal_sources,
@@ -537,7 +539,8 @@ def _fallback_from_retrieval(
     contextual_sources: List[Dict[str, Any]],
 ) -> str:
     if not doctrine_sources and not contextual_sources:
-        return "Faithful resources are still being gathered for this topic. Please check back soon."
+        message = "Faithful resources are still being gathered for this topic. Please check back soon."
+        return append_pastoral_guidance(message)
 
     lines: List[str] = ["Here are some related teachings:"]
     for item in doctrine_sources:
@@ -551,7 +554,8 @@ def _fallback_from_retrieval(
             lines.append(
                 f"- **{item.get('title', 'N/A')}** (score {item.get('score', 0):.2f})"
             )
-    return "\n".join(lines)
+    compiled = "\n".join(lines).strip()
+    return append_pastoral_guidance(compiled)
 
 
 def handle_question(question: str) -> Dict[str, Any]:

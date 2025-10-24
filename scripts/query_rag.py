@@ -209,6 +209,26 @@ def query_with_gpt(question: str, doctrine_k: int = 3, context_k: int = 2) -> Di
     return {"doctrine": doctrine_entries, "context": context_entries}
 
 
+def evaluate_tone(answer: Optional[str]) -> float:
+    """Return a simple tone score between 0 and 1 based on keyword presence."""
+    if not answer:
+        return 0.5
+
+    lower = answer.lower()
+    positive_markers = ["grace", "hope", "love", "comfort", "encourage", "peace", "forgive"]
+    negative_markers = ["anger", "condemn", "harsh", "rebuke", "wrath", "punish"]
+
+    score = 0.5
+    for token in positive_markers:
+        if token in lower:
+            score += 0.05
+    for token in negative_markers:
+        if token in lower:
+            score -= 0.05
+
+    return max(0.0, min(1.0, score))
+
+
 # ---------------------------------------------------------------------
 # (Remaining synthesis + CLI code unchanged from your version)
 # Keep run_gpt_synthesis, evaluate_tone, sanitize_output, log_generation,

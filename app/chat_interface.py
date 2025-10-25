@@ -199,20 +199,27 @@ def push_for_pastoral_review(question: str, assistant_payload: Dict[str, Any]) -
 
     reviewer = get_current_user()
     if reviewer:
-        entry["submitted_by"] = sanitize_text(reviewer)
+        sanitized_reviewer = sanitize_text(reviewer)
+        entry["submitted_by"] = sanitized_reviewer
+        entry["user_id"] = sanitized_reviewer
+    else:
+        entry["user_id"] = "anonymous"
 
     REVIEW_QUEUE_PATH.parent.mkdir(parents=True, exist_ok=True)
     try:
         with REVIEW_QUEUE_PATH.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(entry, ensure_ascii=True) + "\n")
+        logging.debug("Queued response %s locally for review.", response_id)
     except OSError as exc:
         logging.exception("Unable to push response to review queue: %s", exc)
-    _submit_remote_review(entry)
+    if not _submit_remote_review(entry):
+        logging.warning("Remote pastoral review submission failed for %s.", response_id)
 
 
-def _submit_remote_review(entry: Dict[str, Any]) -> None:
+def _submit_remote_review(entry: Dict[str, Any]) -> bool:
     if not REVIEW_API_URL:
-        return
+        logging.debug("REVIEW_API_URL not configured; skipping remote review submission.")
+        return False
 
     headers = {"Content-Type": "application/json"}
     if REVIEW_API_KEY:
@@ -231,8 +238,33 @@ def _submit_remote_review(entry: Dict[str, Any]) -> None:
             timeout=timeout,
         )
         response.raise_for_status()
+        logging.info(
+            "Submitted response %s for pastoral review (status %s).",
+            entry.get("response_id"),
+            response.status_code,
+        )
+        logging.debug(
+            "Review API response body for %s: %s",
+            entry.get("response_id"),
+            response.text,
+        )
+        return True
+    except requests.RequestException as exc:
+        status_code = getattr(exc.response, "status_code", "unknown")
+        body = getattr(exc.response, "text", "")
+        logging.warning(
+            "Review API request failed for %s (status %s): %s",
+            entry.get("response_id"),
+            status_code,
+            body or exc,
+        )
     except Exception as exc:
-        logging.warning("Unable to submit response to review dashboard: %s", exc)
+        logging.warning(
+            "Unable to submit response %s to review dashboard: %s",
+            entry.get("response_id"),
+            exc,
+        )
+    return False
 
 
 def synthesize_with_gpt(question: str, context: str) -> Optional[str]:

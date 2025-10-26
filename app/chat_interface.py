@@ -76,8 +76,11 @@ def _first_non_empty(*values: Optional[str]) -> Optional[str]:
 
 
 def _get_streamlit_secret(*keys: str) -> Optional[str]:
-    secrets_obj = getattr(st, "secrets", None)
-    if not secrets_obj:
+    try:
+        secrets_obj = getattr(st, "secrets", None)
+    except Exception:
+        return None
+    if secrets_obj is None:
         return None
     try:
         node: Any = secrets_obj

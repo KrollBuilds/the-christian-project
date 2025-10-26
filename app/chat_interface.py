@@ -147,6 +147,8 @@ REVIEW_API_URL = _first_non_empty(
 REVIEW_API_KEY_HEADER = _first_non_empty(
     os.getenv("REVIEW_API_KEY"),
     os.getenv("REVIEW_DASHBOARD_KEY"),
+    os.getenv("REVIEW_DASHBOARD_PASS"),
+    os.getenv("REVIEW_DASHBOARD_PASSCODE"),
     _get_streamlit_secret("review_api_key"),
     _get_streamlit_secret("review_api", "key"),
     _get_setting("review_api", "key"),
@@ -155,6 +157,8 @@ REVIEW_API_SHARED_SECRET = _first_non_empty(
     os.getenv("REVIEW_API_SECRET"),
     os.getenv("REVIEW_SHARED_SECRET"),
     os.getenv("REVIEW_DASHBOARD_SECRET"),
+    os.getenv("REVIEW_DASHBOARD_PASS"),
+    os.getenv("REVIEW_DASHBOARD_PASSCODE"),
     _get_streamlit_secret("review_api_secret"),
     _get_streamlit_secret("review_api", "secret"),
     _get_setting("review_api", "secret"),
@@ -179,6 +183,11 @@ client = OpenAI(api_key=OPENAI_API_KEY)
 # TODO: Secure key handling for multi-user hosting (user tokens vs global key).
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
+if REVIEW_API_KEY_HEADER:
+    logging.info("Review API authentication header configured (x-api-key).")
+else:
+    logging.info("Review API key not configured; remote review submission may be rejected if the server requires it.")
 
 GRACE_MESSAGES = [
     (

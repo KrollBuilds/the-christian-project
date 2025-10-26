@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-# TODO: integrate Firebase Auth for user accounts
 # TODO: move logs to encrypted storage (e.g., Supabase or Firestore)
 # TODO: implement admin metrics dashboard for usage and cost
 
@@ -37,7 +36,7 @@ except Exception:
     try:
         from app.auth_utils import get_current_user  # type: ignore
     except Exception:
-        logging.warning("auth_utils not found; using fallback get_current_user returning None.")
+        logging.debug("auth_utils not found; defaulting get_current_user to None.")
         def get_current_user():
             return None
 
@@ -49,7 +48,7 @@ except Exception:
     try:
         from app.privacy_utils import sanitize_text  # type: ignore
     except Exception:
-        logging.warning("privacy_utils not found; using fallback sanitize_text that strips PII.")
+        logging.debug("privacy_utils not found; using internal fallback sanitize_text.")
         import re
         def sanitize_text(text: str) -> str:
             if not isinstance(text, str):
@@ -65,6 +64,45 @@ from config import SETTINGS
 
 load_dotenv()
 
+# ---------------------------------------------------------------------------
+# Configuration helpers
+def _first_non_empty(*values: Optional[str]) -> Optional[str]:
+    for value in values:
+        if value:
+            candidate = str(value).strip()
+            if candidate:
+                return candidate
+    return None
+
+
+def _get_streamlit_secret(*keys: str) -> Optional[str]:
+    secrets_obj = getattr(st, "secrets", None)
+    if not secrets_obj:
+        return None
+    try:
+        node: Any = secrets_obj
+        for key in keys:
+            node = node[key]
+        if isinstance(node, str):
+            return node.strip()
+    except Exception:
+        return None
+    return None
+
+
+def _get_setting(*keys: str) -> Optional[str]:
+    node: Any = SETTINGS
+    for key in keys:
+        if isinstance(node, dict):
+            node = node.get(key)
+        else:
+            return None
+    if isinstance(node, str):
+        return node.strip()
+    return None
+
+
+# ---------------------------------------------------------------------------
 # Preflight environment validation for Railway deployments
 required_vars = ["OPENAI_API_KEY"]
 missing_required = [var for var in required_vars if not os.getenv(var)]
@@ -74,15 +112,6 @@ if missing_required:
         f" Set the following in Railway: {', '.join(missing_required)}"
     )
     st.stop()
-
-# Optional guards for forthcoming auth features
-optional_vars = ["ACCESS_CODE", "DASHBOARD_PASSCODE"]
-missing_optional = [var for var in optional_vars if not os.getenv(var)]
-if missing_optional:
-    logging.warning(
-        "Optional secrets missing (ACCESS_CODE / DASHBOARD_PASSCODE). "
-        "Features relying on them are temporarily disabled."
-    )
 
 # Configure logging early for deployment diagnostics
 logging.basicConfig(level=logging.INFO)
@@ -104,11 +133,36 @@ for path in DATA_PATHS:
 
 FEEDBACK_LOG_PATH = Path("data/metrics/feedback_log.jsonl")
 REVIEW_QUEUE_PATH = Path(os.getenv("REVIEW_QUEUE_PATH", "data/metrics/review_queue.jsonl"))
-REVIEW_API_URL = os.getenv(
-    "REVIEW_API_URL",
-    "https://the-christian-review-dashboard-production.up.railway.app/api/submit_review",
+DEFAULT_REVIEW_API_URL = "https://the-christian-review-dashboard-production.up.railway.app/api/submit_review"
+REVIEW_API_URL = _first_non_empty(
+    os.getenv("REVIEW_API_URL"),
+    _get_streamlit_secret("review_api_url"),
+    _get_streamlit_secret("review_api", "url"),
+    _get_setting("review_api", "url"),
+    DEFAULT_REVIEW_API_URL,
 )
-REVIEW_API_KEY = os.getenv("REVIEW_API_KEY")
+REVIEW_API_KEY_HEADER = _first_non_empty(
+    os.getenv("REVIEW_API_KEY"),
+    os.getenv("REVIEW_DASHBOARD_KEY"),
+    _get_streamlit_secret("review_api_key"),
+    _get_streamlit_secret("review_api", "key"),
+    _get_setting("review_api", "key"),
+)
+REVIEW_API_SHARED_SECRET = _first_non_empty(
+    os.getenv("REVIEW_API_SECRET"),
+    os.getenv("REVIEW_SHARED_SECRET"),
+    os.getenv("REVIEW_DASHBOARD_SECRET"),
+    _get_streamlit_secret("review_api_secret"),
+    _get_streamlit_secret("review_api", "secret"),
+    _get_setting("review_api", "secret"),
+)
+REVIEW_API_BEARER_TOKEN = _first_non_empty(
+    os.getenv("REVIEW_API_BEARER_TOKEN"),
+    os.getenv("REVIEW_API_TOKEN"),
+    _get_streamlit_secret("review_api_bearer_token"),
+    _get_streamlit_secret("review_api", "bearer_token"),
+    _get_setting("review_api", "bearer_token"),
+)
 REVIEW_API_TIMEOUT = os.getenv("REVIEW_API_TIMEOUT", "5")
 
 # To set key locally: echo "OPENAI_API_KEY=yourkey" > .env
@@ -216,14 +270,36 @@ def push_for_pastoral_review(question: str, assistant_payload: Dict[str, Any]) -
         logging.warning("Remote pastoral review submission failed for %s.", response_id)
 
 
+def _build_review_headers() -> Dict[str, str]:
+    headers: Dict[str, str] = {"Content-Type": "application/json"}
+    if REVIEW_API_KEY_HEADER:
+        headers["x-api-key"] = REVIEW_API_KEY_HEADER
+    if REVIEW_API_SHARED_SECRET:
+        headers.setdefault("x-review-secret", REVIEW_API_SHARED_SECRET)
+    bearer_token = REVIEW_API_BEARER_TOKEN or REVIEW_API_SHARED_SECRET or REVIEW_API_KEY_HEADER
+    if bearer_token:
+        headers.setdefault("Authorization", f"Bearer {bearer_token}")
+    return headers
+
+
+def _build_review_payload(entry: Dict[str, Any]) -> Dict[str, Any]:
+    payload = dict(entry)
+    secret = REVIEW_API_SHARED_SECRET or REVIEW_API_BEARER_TOKEN
+    if secret:
+        payload.setdefault("secret", secret)
+        payload.setdefault("api_secret", secret)
+    if REVIEW_API_KEY_HEADER:
+        payload.setdefault("api_key", REVIEW_API_KEY_HEADER)
+    return payload
+
+
 def _submit_remote_review(entry: Dict[str, Any]) -> bool:
     if not REVIEW_API_URL:
         logging.debug("REVIEW_API_URL not configured; skipping remote review submission.")
         return False
 
-    headers = {"Content-Type": "application/json"}
-    if REVIEW_API_KEY:
-        headers["x-api-key"] = REVIEW_API_KEY  # align with review API authentication
+    headers = _build_review_headers()
+    payload = _build_review_payload(entry)
 
     try:
         timeout = float(REVIEW_API_TIMEOUT)
@@ -233,7 +309,7 @@ def _submit_remote_review(entry: Dict[str, Any]) -> bool:
     try:
         response = requests.post(
             REVIEW_API_URL,
-            json=entry,
+            json=payload,
             headers=headers,
             timeout=timeout,
         )
@@ -295,41 +371,6 @@ def synthesize_with_gpt(question: str, context: str) -> Optional[str]:
     sanitized = sanitize_text(answer_text).strip()
     return append_pastoral_guidance(sanitized)
 
-def enforce_access_code(state_key: str, prompt_label: str = "Access code") -> None:
-    if not SETTINGS.get("access_control", True):
-        return
-
-    access_code = os.getenv("ACCESS_CODE")
-    if not access_code:
-        return
-
-    if st.session_state.get(state_key):
-        return
-
-    st.title("The Christian Project")
-    st.caption("Faithful answers for curious hearts.")
-    st.markdown("### 🔑 Access Required")
-    st.info("Enter the reviewer passcode provided by your administrator to continue.")
-
-    code_key = f"{state_key}_input"
-    submit_key = f"{state_key}_submit"
-    code = st.text_input(prompt_label, type="password", key=code_key)
-    submitted = st.button("Unlock", key=submit_key)
-
-    if submitted:
-        if code == access_code:
-            st.session_state[state_key] = True
-            st.session_state.pop(code_key, None)
-            st.session_state.pop(submit_key, None)
-            if hasattr(st, "rerun"):
-                st.rerun()
-            else:
-                st.experimental_rerun()
-        else:
-            st.error("Invalid access code.")
-
-    st.stop()
-
 try:
     from scripts.query_rag import (  # noqa: E402
         append_pastoral_guidance,
@@ -373,8 +414,6 @@ st.set_page_config(
     page_icon="✝️",
     layout="centered",
 )
-
-enforce_access_code("chat_access_granted")
 
 st.markdown("""
 <style>
@@ -712,7 +751,6 @@ def process_input(user_input_raw: str) -> None:
     st.toast("✅ Response generated", icon="✨")
 
 
-# TODO: Add persistent user sessions with login
 # Review dashboard integration handled via push_for_pastoral_review
 
 def run_chat_interface() -> None:

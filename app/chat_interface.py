@@ -8,12 +8,14 @@ from __future__ import annotations
 # Developer toggle: st.session_state["developer_mode"] = True to show tonal metrics
 # TODO: Future Phase — Convert this Streamlit prototype into a FastAPI backend with REST endpoints for /query and /review.
 
+import copy
 import itertools
 import json
 import logging
 import os
 import random
 import sys
+import textwrap
 from datetime import datetime, timezone
 import time
 from pathlib import Path
@@ -398,7 +400,7 @@ except Exception as exc:
     st.set_page_config(
         page_title="The Christian Project",
         page_icon="✝️",
-        layout="centered",
+        layout="wide",
     )
     st.markdown(
         """
@@ -417,191 +419,479 @@ except Exception as exc:
 
 
 # Safeguard session state directly after imports
-if "chat_history" not in st.session_state:
-    st.session_state.chat_history = []
-
+_initialize_ui_state()
 
 st.set_page_config(
     page_title="The Christian Project",
     page_icon="✝️",
-    layout="centered",
+    layout="wide",
 )
 
 st.markdown("""
 <style>
-body, .stApp {
+:root {
+    color-scheme: only light;
+}
+
+html, body, .stApp {
     background-color: #f2ede3;
-    color: #1a120a;
+    color: #24190f;
     font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
-    margin: 0;
+    font-size: 17px;
+    line-height: 1.6;
+}
+
+.stApp {
     overflow-x: hidden;
 }
 
-main .block-container {
-    max-width: 760px;
-    padding: 1.2rem 1.5rem 6.5rem;
-    margin: 0 auto;
+a {
+    color: #704c1f;
 }
 
-header, .stApp header {
-    background-color: #f8f5ee;
-    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
-    border-bottom: 1px solid #d8c9b8;
+main .block-container {
+    max-width: 1200px;
+    padding: 1.2rem 1.75rem 9rem;
+}
+
+@media (min-width: 1024px) {
+    main .block-container {
+        padding: 2rem 3rem 10rem;
+    }
+}
+
+section[data-testid="stSidebar"] {
+    background: linear-gradient(180deg, #ece2d1 0%, #e2d5c1 100%);
+    border-right: 1px solid rgba(46, 35, 25, 0.08);
+}
+
+section[data-testid="stSidebar"] > div {
+    padding: 1.75rem 1.5rem 3rem;
+}
+
+section[data-testid="stSidebar"] h1,
+section[data-testid="stSidebar"] h2,
+section[data-testid="stSidebar"] h3,
+section[data-testid="stSidebar"] p,
+section[data-testid="stSidebar"] li,
+section[data-testid="stSidebar"] a,
+section[data-testid="stSidebar"] label {
+    color: #2f2317;
+}
+
+section[data-testid="stSidebar"] h1 {
+    font-size: 1.1rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 1.5rem;
+}
+
+section[data-testid="stSidebar"] .sidebar-section-title {
+    font-size: 0.82rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #66543d;
+    margin-top: 2.1rem;
+    margin-bottom: 0.75rem;
+}
+
+section[data-testid="stSidebar"] button[data-testid="baseButton-primary"] {
+    background: #4a3422;
+    color: #f8f6f0;
+    border-radius: 999px;
+    border: none;
+    padding: 0.75rem 1rem;
+    font-weight: 600;
+    box-shadow: 0 6px 18px rgba(56, 38, 24, 0.18);
+}
+
+section[data-testid="stSidebar"] button[data-testid="baseButton-primary"]:hover {
+    background: #3c2a1c;
+}
+
+section[data-testid="stSidebar"] button[data-testid="baseButton-secondary"] {
+    background: rgba(255, 255, 255, 0.6);
+    color: #2f2317;
+    border-radius: 12px;
+    border: 1px solid rgba(68, 51, 33, 0.12);
+    padding: 0.55rem 0.75rem;
+    justify-content: flex-start;
+}
+
+section[data-testid="stSidebar"] button[data-testid="baseButton-secondary"]:hover {
+    background: rgba(255, 255, 255, 0.82);
+}
+
+.recent-question-button span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: block;
+    width: 100%;
+}
+
+.chat-wrapper {
+    background: rgba(255, 255, 255, 0.55);
+    border-radius: 24px;
+    padding: 1.75rem;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.05);
+    margin: 0 auto;
+    max-width: 900px;
+    width: 100%;
+}
+
+@media (max-width: 900px) {
+    .chat-wrapper {
+        background: transparent;
+        box-shadow: none;
+        padding: 1rem 0 0;
+        max-width: 100%;
+    }
+}
+
+.chat-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1.5rem;
+    margin-bottom: 1rem;
+}
+
+.chat-header-left {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.chat-title-group h1 {
+    font-size: 1.65rem;
+    margin-bottom: 0.15rem;
+    color: #2b1f13;
+}
+
+.chat-title-group p {
+    margin: 0;
+    color: #5c4a34;
+    font-size: 0.95rem;
+}
+
+.chat-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.preview-pill {
+    background: rgba(70, 52, 33, 0.18);
+    color: #4a3625;
+    padding: 0.45rem 0.85rem;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+.trust-panel {
+    background: rgba(255, 255, 255, 0.75);
+    border: 1px solid rgba(70, 52, 33, 0.18);
+    border-radius: 16px;
+    padding: 0.9rem 1.05rem;
+    color: #463827;
+    font-size: 0.9rem;
+    margin-bottom: 1.5rem;
+}
+
+.trust-panel ul {
+    list-style: none;
+    padding-left: 0;
+    margin: 0;
+}
+
+.trust-panel li {
+    margin-bottom: 0.35rem;
+}
+
+.trust-panel li:last-child {
+    margin-bottom: 0;
+}
+
+.chat-wrapper div[data-testid="stVerticalBlock"]:has(> div[data-testid="stChatMessage"]) {
+    background: rgba(255, 255, 255, 0.6);
+    border-radius: 18px;
+    padding: 1.1rem 1.25rem;
+    max-height: 70vh;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 1.1rem;
+}
+
+.chat-wrapper div[data-testid="stVerticalBlock"]:has(> div[data-testid="stChatMessage"])::-webkit-scrollbar {
+    width: 8px;
+}
+
+.chat-wrapper div[data-testid="stVerticalBlock"]:has(> div[data-testid="stChatMessage"])::-webkit-scrollbar-thumb {
+    background-color: rgba(90, 70, 50, 0.3);
+    border-radius: 999px;
+}
+
+.chat-scroll {
+    background: rgba(255, 255, 255, 0.6);
+    border-radius: 18px;
+    padding: 1.1rem 1.25rem;
+    max-height: 70vh;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 1.1rem;
+}
+
+@media (max-width: 900px) {
+    .chat-scroll {
+        background: rgba(255, 255, 255, 0.35);
+        padding: 0.5rem 0.25rem;
+        max-height: none;
+        overflow-y: visible;
+    }
+    .chat-wrapper div[data-testid="stVerticalBlock"]:has(> div[data-testid="stChatMessage"]) {
+        background: rgba(255, 255, 255, 0.35);
+        padding: 0.6rem 0.25rem;
+        max-height: none;
+        overflow-y: visible;
+        gap: 0.9rem;
+    }
+}
+
+.chat-scroll::-webkit-scrollbar {
+    width: 8px;
+}
+
+.chat-scroll::-webkit-scrollbar-thumb {
+    background-color: rgba(90, 70, 50, 0.3);
+    border-radius: 999px;
 }
 
 .stChatMessage {
-    max-width: 100%;
-    word-break: break-word;
+    background: transparent;
+    padding: 0 !important;
 }
 
-.stChatMessage[data-testid="stChatMessage-User"] {
-    background-color: #f8e9be;
-    border: 1px solid #d6ba75;
-    border-radius: 16px;
-    padding: 0.85rem;
-    color: #2a1e12;
+.stChatMessage[data-testid="stChatMessage-User"] > div {
     margin-left: auto;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.08);
+    max-width: 90%;
+    background: #f6e4b5;
+    border-radius: 18px;
+    border: 1px solid rgba(148, 116, 62, 0.35);
+    padding: 0.75rem 1rem;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
 }
 
-.stChatMessage[data-testid="stChatMessage-Assistant"] {
-    background-color: #ffffff;
-    border: 1px solid #e0d2be;
-    border-radius: 16px;
-    padding: 1rem;
+.stChatMessage[data-testid="stChatMessage-Assistant"] > div {
     margin-right: auto;
-    box-shadow: 0 3px 6px rgba(0, 0, 0, 0.08);
+    max-width: 90%;
+    background: #fffaf1;
+    border-radius: 18px;
+    border: 1px solid rgba(126, 100, 66, 0.2);
+    padding: 0.85rem 1.05rem;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.07);
 }
 
 .stChatMessage .stMarkdown p {
-    color: #2a1e12 !important;
-    line-height: 1.65;
-    font-size: 1.02rem;
-}
-
-.stChatMessage .stMarkdown ul,
-.stChatMessage .stMarkdown ol {
-    padding-left: 1.1rem;
-}
-
-.stChatInput textarea,
-.stTextInput>div>div>input {
-    background-color: #fffdfa !important;
-    color: #1b1b1b !important;
-    border: 1px solid #d5c5b3 !important;
-    border-radius: 12px !important;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) inset;
-}
-
-.stChatInput textarea {
-    padding: 0.85rem !important;
-    font-size: 1.02rem !important;
-    line-height: 1.4 !important;
-}
-
-.stChatInput textarea::placeholder {
-    color: #8f7c67 !important;
-}
-
-.stChatInput button[kind="secondary"] {
-    border-radius: 12px !important;
-    background-color: #c8a96f !important;
-    color: #fffdfa !important;
-    font-weight: 600 !important;
-    border: none !important;
-    padding: 0 1.25rem !important;
-    height: 48px !important;
-    box-shadow: 0 2px 3px rgba(0, 0, 0, 0.12);
-}
-
-.stChatInput button[kind="secondary"]:hover {
-    background-color: #b08f56 !important;
-}
-
-.stAlert, [data-testid="stNotification"] {
-    background-color: #fff3e6 !important;
-    color: #402d1a !important;
-    border-left: 4px solid #d08a32 !important;
-    border-radius: 10px !important;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.06);
-}
-
-.feedback-wrapper {
-    margin-top: 0.75rem;
-    background-color: #fdf8f2;
-    border: 1px solid #e0d0b6;
-    padding: 0.75rem;
-    border-radius: 10px;
+    line-height: 1.68;
+    color: #2b1f13 !important;
 }
 
 .feedback-wrapper p {
-    margin-bottom: 0.4rem;
-    font-weight: 600;
-    color: #3b2e1e;
+    font-size: 0.85rem;
+    color: #5e4c34;
 }
 
-h1, h2, h3, h4 {
-    color: #3c2c18 !important;
-    font-family: "Georgia", serif;
+.doctrinal-footer {
+    color: #6d5a43;
+    font-size: 0.82rem;
+    margin: 1rem 0 0.5rem;
+    text-align: center;
 }
 
-[data-testid="stExpander"] {
-    background-color: #fffdfa !important;
-    border: 1px solid #e1d3c0 !important;
-    border-radius: 10px !important;
+.stChatInput {
+    background: #2d2120;
+    padding: 0.85rem 1.1rem 1.15rem;
+    border-top-left-radius: 18px;
+    border-top-right-radius: 18px;
+    box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.12);
+    max-width: 900px;
+    margin: 0 auto;
 }
 
-#MainMenu, footer {
+@media (min-width: 1024px) {
+    .stChatInput {
+        margin-left: calc(260px + 3.5rem);
+        margin-right: 3.5rem;
+    }
+}
+
+.stChatInput > div {
+    gap: 0.65rem !important;
+}
+
+.stChatInput textarea {
+    background: #fffdfa !important;
+    border-radius: 14px !important;
+    border: 1px solid rgba(255, 255, 255, 0.4) !important;
+    color: #2d2120 !important;
+    padding: 0.85rem 1rem !important;
+    font-size: 1rem !important;
+}
+
+.stChatInput textarea::placeholder {
+    color: rgba(80, 60, 45, 0.8) !important;
+}
+
+.stChatInput button[data-testid="baseButton-secondary"] {
+    background: #d8b26f !important;
+    border-radius: 999px !important;
+    border: none !important;
+    width: 88px;
+    height: 46px !important;
+    justify-content: center;
+    position: relative;
+}
+
+.stChatInput button[data-testid="baseButton-secondary"] svg {
     display: none;
 }
 
-@media (max-width: 768px) {
-    main .block-container {
-        padding: 1rem 1rem 7rem;
+.stChatInput button[data-testid="baseButton-secondary"]::after {
+    content: "Ask";
+    font-weight: 600;
+    color: #2d2120;
+    font-size: 0.95rem;
+}
+
+.stChatInput button[data-testid="baseButton-secondary"]:hover {
+    background: #c59a4b !important;
+}
+
+@media (max-width: 900px) {
+    .chat-header {
+        flex-direction: column;
+        align-items: flex-start;
     }
-    .stChatMessage {
-        border-radius: 14px;
+    .chat-header-actions {
+        width: 100%;
+        justify-content: flex-end;
     }
-    .stChatMessage[data-testid="stChatMessage-User"],
-    .stChatMessage[data-testid="stChatMessage-Assistant"] {
-        margin: 0.45rem 0;
-    }
-    .stChatMessage .stMarkdown p {
-        font-size: 1rem;
+    .stChatInput {
+        margin: 0.75rem 0.75rem 0;
+        max-width: calc(100% - 1.5rem);
+        border-radius: 22px;
     }
 }
 
-@media (max-width: 480px) {
-    main .block-container {
-        padding: 0.75rem 0.85rem 7.5rem;
+@media (max-width: 600px) {
+    .chat-title-group h1 {
+        font-size: 1.4rem;
     }
-    .stChatMessage[data-testid="stChatMessage-User"],
-    .stChatMessage[data-testid="stChatMessage-Assistant"] {
-        padding: 0.8rem;
+    .chat-title-group p {
+        font-size: 0.9rem;
     }
-    .stChatInput {
+}
+
+body.sidebar-open section[data-testid="stSidebar"] {
+    transform: translateX(0);
+    box-shadow: 2px 0 20px rgba(0, 0, 0, 0.2);
+}
+
+@media (max-width: 900px) {
+    section[data-testid="stSidebar"] {
         position: fixed;
+        top: 0;
         left: 0;
-        right: 0;
         bottom: 0;
-        background: rgba(242, 237, 227, 0.96);
-        padding: 0.6rem 0.9rem 1rem;
-        border-top: 1px solid #d8c9b8;
-        box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.08);
-        z-index: 100;
+        width: min(85%, 280px);
+        transform: translateX(-100%);
+        transition: transform 0.3s ease;
+        z-index: 1000;
+        padding-top: 1.5rem;
     }
-    .stChatInput > div {
-        gap: 0.5rem !important;
+    body.sidebar-open::after {
+        content: "";
+        position: fixed;
+        inset: 0;
+        background: rgba(27, 20, 14, 0.35);
+        z-index: 999;
     }
-    .stChatInput textarea {
-        min-height: 54px !important;
-        font-size: 1rem !important;
+    section[data-testid="stSidebar"] > div {
+        height: 100%;
+        overflow-y: auto;
     }
-    .stChatInput button[kind="secondary"] {
-        height: 46px !important;
-        font-size: 1rem !important;
-        padding: 0 1.1rem !important;
+    .mobile-only {
+        display: inline-flex !important;
     }
+}
+
+.mobile-only {
+    display: none !important;
+}
+
+.hamburger-flag + div[data-testid="stButton"] button {
+    background: transparent;
+    border: 1px solid rgba(70, 52, 33, 0.2);
+    color: #4a3625;
+    border-radius: 12px;
+    width: 46px;
+    height: 46px;
+    font-size: 1.2rem;
+}
+
+.hamburger-flag + div[data-testid="stButton"] {
+    display: none;
+}
+
+@media (max-width: 900px) {
+    .hamburger-flag + div[data-testid="stButton"] {
+        display: block;
+    }
+}
+
+.header-mobile-button-flag + div[data-testid="stButton"] {
+    display: none;
+}
+
+@media (max-width: 900px) {
+    .header-mobile-button-flag + div[data-testid="stButton"] {
+        display: block;
+    }
+    .header-mobile-button-flag + div[data-testid="stButton"] button {
+        background: rgba(255,255,255,0.25);
+        border-radius: 999px;
+        border: 1px solid rgba(255,255,255,0.4);
+        color: #fff;
+        font-size: 0.85rem;
+        padding: 0.4rem 0.9rem;
+    }
+}
+
+.header-actions-container > div[data-testid="stButton"] {
+    margin-right: 0.5rem;
+}
+
+.header-actions-container > div[data-testid="stButton"] button {
+    background: rgba(74, 54, 34, 0.12);
+    border-radius: 999px;
+    border: 1px solid rgba(74, 54, 34, 0.25);
+    color: #3a2a1b;
+    font-size: 0.85rem;
+    padding: 0.35rem 0.9rem;
+}
+
+@media (min-width: 901px) {
+    .header-mobile-button-flag + div[data-testid="stButton"] {
+        display: none !important;
+    }
+}
+
+div[data-testid="stSidebarNav"] {
+    display: none;
 }
 </style>
 
@@ -613,15 +903,233 @@ RETRIEVAL_UNAVAILABLE_MSG = (
     "The retrieval system is temporarily unavailable. Please check your setup or try again later."
 )
 
+RECENT_QUESTIONS_LIMIT = 8
+DEFAULT_RECENT_QUESTIONS = [
+    "How do Lutherans understand grace alone?",
+    "What comfort does baptism give me?",
+    "Why do we confess our sins each week?",
+    "How should I pray when I'm anxious?",
+    "What is the role of the pastor in spiritual care?",
+    "How can I discern God's will in daily decisions?",
+    "What does Scripture say about suffering faithfully?",
+    "How is Holy Communion a means of grace?",
+]
 
-def render_header() -> None:
+
+def _initialize_ui_state() -> None:
+    if "chat_history" not in st.session_state:
+        st.session_state.chat_history = []
+    if "recent_questions" not in st.session_state:
+        st.session_state.recent_questions = DEFAULT_RECENT_QUESTIONS[:RECENT_QUESTIONS_LIMIT]
+    if "conversation_archive" not in st.session_state:
+        st.session_state.conversation_archive = {}
+    if "show_about_modal" not in st.session_state:
+        st.session_state.show_about_modal = False
+    if "sidebar_open" not in st.session_state:
+        st.session_state.sidebar_open = False
+
+
+def _sync_sidebar_body_class() -> None:
+    class_name = "sidebar-open" if st.session_state.get("sidebar_open") else ""
+    st.markdown(
+        f"""
+        <script>
+        try {{
+            const body = window.parent?.document?.body || window.document.body;
+            if (!body) {{
+                return;
+            }}
+            body.classList.remove("sidebar-open");
+            if ("{class_name}" === "sidebar-open") {{
+                body.classList.add("sidebar-open");
+            }}
+        }} catch (error) {{
+            // graceful no-op if we cannot reach the parent body
+        }}
+        </script>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def reset_conversation() -> None:
+    st.session_state.chat_history = []
+    st.session_state.last_question = None
+    st.session_state.last_submission_time = 0.0
+    st.session_state.last_activity = time.time()
+    st.session_state.pop("user_input", None)
+
+
+def update_recent_questions(question: str) -> None:
+    if not question:
+        return
+    recents = [
+        item for item in st.session_state.get("recent_questions", []) if item != question
+    ]
+    recents.insert(0, question)
+    st.session_state.recent_questions = recents[:RECENT_QUESTIONS_LIMIT]
+    archive = st.session_state.get("conversation_archive", {})
+    archive[question] = copy.deepcopy(st.session_state.chat_history)
+    st.session_state.conversation_archive = archive
+
+
+def load_conversation_from_recent(question: str) -> None:
+    archive = st.session_state.get("conversation_archive", {})
+    conversation = archive.get(question)
+    if conversation:
+        st.session_state.chat_history = copy.deepcopy(conversation)
+    else:
+        st.session_state.chat_history = []
+    st.session_state.last_question = None
+    st.session_state.last_submission_time = 0.0
+    st.session_state.sidebar_open = False
+
+
+def _format_recent_question_label(question: str) -> str:
+    single_line = " ".join(question.strip().split())
+    return textwrap.shorten(single_line, width=48, placeholder="…")
+
+
+def render_about_modal() -> None:
+    if not st.session_state.get("show_about_modal"):
+        return
+
+    if hasattr(st, "modal"):
+        with st.modal("About & Guidance", key="about_guidance_modal"):
+            st.markdown(
+                """
+                This assistant gives biblical answers according to confessional Lutheran teaching.
+
+                - For personal spiritual care, please speak with your pastor.
+                - Your questions may be reviewed by a pastor to improve clarity and faithfulness.
+                """.strip()
+            )
+            if st.button("Close", key="close_about_modal"):
+                st.session_state.show_about_modal = False
+                st.experimental_rerun()
+    else:
+        st.info(
+            "This assistant gives biblical answers according to confessional Lutheran teaching.\n\n"
+            "- For personal spiritual care, please speak with your pastor.\n"
+            "- Your questions may be reviewed by a pastor to improve clarity and faithfulness."
+        )
+        st.session_state.show_about_modal = False
+
+
+def render_sidebar() -> None:
+    sidebar = st.sidebar
+    sidebar.markdown(
+        """
+        <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom: 0.75rem;">
+            <span style="font-size: 1.4rem;">✝️</span>
+            <div>
+                <div style="font-size:0.78rem; letter-spacing:0.22em; text-transform:uppercase; color:#6d5940;">The</div>
+                <div style="font-family:'Georgia', serif; font-weight:600; font-size:1.1rem; margin-top:-0.2rem;">Christian Project</div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    sidebar.markdown(
+        "<p style='margin-top:-0.4rem; color:#6d5940;'>Faithful answers for curious hearts.</p>",
+        unsafe_allow_html=True,
+    )
+
+    if sidebar.button(
+        "New Chat",
+        key="sidebar_new_chat",
+        type="primary",
+        use_container_width=True,
+    ):
+        reset_conversation()
+        st.session_state.sidebar_open = False
+        st.toast("🕊️ Conversation cleared. Ready for a new question.")
+        st.experimental_rerun()
+
+    sidebar.markdown(
+        "<div class='sidebar-section-title'>Recent Questions</div>", unsafe_allow_html=True
+    )
+
+    recent_questions = st.session_state.get("recent_questions", [])
+    if not recent_questions:
+        sidebar.caption("No recent questions yet. Ask your first one!")
+    else:
+        for idx, question in enumerate(recent_questions):
+            label = _format_recent_question_label(question)
+            if sidebar.button(
+                label,
+                key=f"recent_question_{idx}",
+                type="secondary",
+                use_container_width=True,
+            ):
+                load_conversation_from_recent(question)
+                st.experimental_rerun()
+
+    sidebar.markdown(
+        "<div class='sidebar-section-title'>Guidance</div>", unsafe_allow_html=True
+    )
+    if sidebar.button(
+        "About & Guidance",
+        key="open_about_modal",
+        type="secondary",
+        use_container_width=True,
+    ):
+        st.session_state.show_about_modal = True
+        st.experimental_rerun()
+
+
+def render_trust_panel() -> None:
     st.markdown(
         """
-        <header class="main-header" style="text-align:center; padding-top: 1rem;">
-            <h1 style="margin-bottom: 0.25rem;">The Christian Project</h1>
-            <p style="margin-top: 0; color: #6b6b6b;">Faithful answers for curious hearts.</p>
-        </header>
+        <div class="trust-panel">
+            <ul>
+                <li>Please don’t include personal details (names, locations, etc.).</li>
+                <li>Responses are grounded in Scripture and Lutheran teaching.</li>
+                <li>For personal or urgent spiritual care, please talk with your pastor.</li>
+            </ul>
+        </div>
         """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_main_header() -> None:
+    col_left, col_right = st.columns([7, 3], gap="medium")
+    with col_left:
+        btn_col, title_col = st.columns([1, 9], gap="small")
+        with btn_col:
+            st.markdown('<div class="hamburger-flag"></div>', unsafe_allow_html=True)
+            if st.button("☰", key="toggle_sidebar", type="secondary"):
+                st.session_state.sidebar_open = not st.session_state.get("sidebar_open", False)
+        with title_col:
+            st.markdown(
+                """
+                <div class="chat-header-left">
+                    <div class="chat-title-group">
+                        <h1>The Christian Project</h1>
+                        <p>Faithful answers for curious hearts.</p>
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+    with col_right:
+        action_btn_col, badge_col = st.columns([1.2, 1], gap="small")
+        with action_btn_col:
+            st.markdown('<div class="header-mobile-button-flag"></div>', unsafe_allow_html=True)
+            if st.button("New Chat", key="header_new_chat", type="secondary"):
+                reset_conversation()
+                st.session_state.sidebar_open = False
+                st.toast("🕊️ Conversation cleared. Ready for a new question.")
+                st.experimental_rerun()
+        with badge_col:
+            st.markdown('<div class="preview-pill">Preview Build</div>', unsafe_allow_html=True)
+    _sync_sidebar_body_class()
+
+
+def render_doctrinal_footer() -> None:
+    st.markdown(
+        '<div class="doctrinal-footer">This assistant is not a substitute for pastoral care. Please speak with your pastor for personal guidance.</div>',
         unsafe_allow_html=True,
     )
 
@@ -674,7 +1182,6 @@ def display_chat_history() -> None:
                 for warning in warnings:
                     st.caption(f"⚠️ {warning}")
 
-            st.markdown("---")
             feedback_container = st.container()
             with feedback_container:
                 st.markdown(
@@ -819,35 +1326,32 @@ def process_input(user_input_raw: str) -> None:
     )
     st.session_state.chat_history.append(assistant_message)
     push_for_pastoral_review(user_input, assistant_message)
+    update_recent_questions(user_input)
     st.toast("✅ Response generated", icon="✨")
 
 
 # Review dashboard integration handled via push_for_pastoral_review
 
 def run_chat_interface() -> None:
-    render_header()
     TIMEOUT_MINUTES = 30
     now = time.time()
 
     if "last_activity" not in st.session_state:
         st.session_state.last_activity = now
     elif now - st.session_state.last_activity > TIMEOUT_MINUTES * 60:
-        st.session_state.chat_history = []
-        st.session_state.last_question = None
-        st.session_state.last_submission_time = 0.0
-        st.success("Session cleared due to inactivity.")
+        reset_conversation()
+        st.info("Session cleared after a quiet pause. Ready whenever you are.")
         st.toast("🧹 Conversation cleared", icon="🕊️")
-    st.session_state.last_activity = now
+    st.session_state.last_activity = time.time()
 
-    with st.container():
+    render_sidebar()
+
+    chat_shell = st.container()
+    with chat_shell:
+        render_main_header()
+        render_trust_panel()
         display_chat_history()
-
-    st.sidebar.markdown("✅ **System Status:** Online")
-
-    if SETTINGS.get("privacy_disclaimer", True):
-        st.caption(
-            "⚠️ Do not share personal or identifying information. Conversations are logged anonymously for quality improvement."
-        )
+        render_doctrinal_footer()
 
     user_input = st.chat_input(
         "Ask a theological question...", key="user_input"
@@ -861,9 +1365,14 @@ def run_chat_interface() -> None:
         else:
             st.experimental_rerun()
 
+    render_about_modal()
+
 
 try:
     run_chat_interface()
+    logging.info(
+        "System update complete. UI now communicates safety, clarity, and ongoing pastoral oversight without changing theology."
+    )
 except Exception as exc:
     logging.exception("Unhandled error in interface: %s", exc)
     show_grace_message()

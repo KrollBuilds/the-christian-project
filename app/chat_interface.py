@@ -418,8 +418,6 @@ except Exception as exc:
     st.stop()
 
 
-# Safeguard session state directly after imports
-_initialize_ui_state()
 
 st.set_page_config(
     page_title="The Christian Project",
@@ -1333,6 +1331,7 @@ def process_input(user_input_raw: str) -> None:
 # Review dashboard integration handled via push_for_pastoral_review
 
 def run_chat_interface() -> None:
+    _initialize_ui_state()
     TIMEOUT_MINUTES = 30
     now = time.time()
 

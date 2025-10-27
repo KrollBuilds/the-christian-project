@@ -198,13 +198,25 @@ def retrieve_similar(query: str, model: SentenceTransformer, index: faiss.Index,
 def _format_metadata_snippet(entry: Dict[str, object]) -> str:
     title = entry.get("title") or "Doctrinal Reference"
     content = entry.get("content", "")
-    snippet = f"Title: {title}"
+    lines = [f"Title: {title}"]
+    pastor = entry.get("pastor") or entry.get("speaker")
+    if pastor:
+        lines.append(f"Pastor: {pastor}")
+    event_date = entry.get("event_date") or entry.get("date")
+    if event_date:
+        lines.append(f"Date: {event_date}")
+    topic = entry.get("topic") or entry.get("series")
+    if topic:
+        lines.append(f"Topic: {topic}")
+    source = entry.get("source") or entry.get("source_file")
+    if source:
+        lines.append(f"Source: {source}")
     if content:
-        snippet += f"\nContent: {content}"
+        lines.append(f"Content: {content}")
     if "scripture_refs" in entry and entry["scripture_refs"]:
         refs = ", ".join(entry["scripture_refs"])
-        snippet += f"\nScripture Refs: {refs}"
-    return snippet.strip()
+        lines.append(f"Scripture Refs: {refs}")
+    return "\n".join(lines).strip()
 
 def build_doctrinal_context(entries: List[Dict[str, object]]) -> str:
     if not entries: return "No doctrinal sources available."
@@ -212,10 +224,7 @@ def build_doctrinal_context(entries: List[Dict[str, object]]) -> str:
 
 def build_contextual_context(entries: List[Dict[str, object]]) -> str:
     if not entries: return "No contextual sources available."
-    parts = []
-    for e in entries:
-        parts.append(f"Title: {e.get('title','')}\nType: {e.get('type','')}\nContent: {e.get('content','')}")
-    return "\n\n".join(parts)
+    return "\n\n".join(_format_metadata_snippet(e) for e in entries)
 
 # ---------------------------------------------------------------------
 # Main retrieval interfaces

@@ -1167,9 +1167,286 @@ footer {
     });
     observer.observe(doc, { childList: true, subtree: true });
     enhanceButtons();
-    window.__tcp_refresh_buttons = enhanceButtons;
+window.__tcp_refresh_buttons = enhanceButtons;
 })();
 </script>
+""", unsafe_allow_html=True)
+
+st.markdown("""
+<style>
+:root {
+    --surface-card: #f6f0dc;
+    --surface-muted: #efe4d0;
+    --surface-sidebar: #f1e9dc;
+    --accent: #4b2e05;
+    --accent-hover: #6d4210;
+    --accent-soft: rgba(75, 46, 5, 0.2);
+    --inverse-text: #fffaf0;
+    --shadow-light: 0 3px 12px rgba(0, 0, 0, 0.08);
+}
+
+body[data-theme="dark"] {
+    --surface-card: #25201b;
+    --surface-muted: #1f1b17;
+    --surface-sidebar: #1f1b17;
+    --accent: #d8b079;
+    --accent-hover: #e2c48f;
+    --accent-soft: rgba(216, 176, 121, 0.24);
+    --inverse-text: #1f1b17;
+    --shadow-light: 0 4px 16px rgba(0, 0, 0, 0.45);
+}
+
+@media (prefers-color-scheme: dark) {
+    body:not([data-theme]) {
+        --surface-card: #25201b;
+        --surface-muted: #1f1b17;
+        --surface-sidebar: #1f1b17;
+        --accent: #d8b079;
+        --accent-hover: #e2c48f;
+        --accent-soft: rgba(216, 176, 121, 0.24);
+        --inverse-text: #1f1b17;
+        --shadow-light: 0 4px 16px rgba(0, 0, 0, 0.45);
+    }
+}
+
+body, .stApp {
+    background: var(--background);
+    color: var(--text-primary);
+    font-family: "Spectral", "Georgia", "Times New Roman", serif;
+}
+
+section[data-testid="stSidebar"] {
+    background: var(--surface-sidebar);
+    border-right: 1px solid var(--divider);
+}
+
+section[data-testid="stSidebar"] > div {
+    padding: 1.75rem 1.5rem 3rem;
+}
+
+section[data-testid="stSidebar"] button[data-testid="baseButton-primary"] {
+    background: var(--accent) !important;
+    color: var(--inverse-text) !important;
+    border-radius: 14px !important;
+    border: none !important;
+    font-weight: 600 !important;
+    box-shadow: var(--shadow-soft);
+}
+
+section[data-testid="stSidebar"] button[data-testid="baseButton-primary"]:hover {
+    background: var(--accent-hover) !important;
+}
+
+section[data-testid="stSidebar"] button[data-testid="baseButton-secondary"] {
+    background: var(--surface-card) !important;
+    color: var(--text-primary) !important;
+    border: 1px solid var(--divider) !important;
+    border-radius: 12px !important;
+    font-family: var(--font-ui) !important;
+}
+
+.sidebar-brand {
+    display: flex;
+    align-items: center;
+    gap: 0.9rem;
+    margin-bottom: 1.2rem;
+}
+
+.sidebar-brand-text {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+}
+
+.sidebar-brand-kicker {
+    font-size: 0.78rem;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    font-family: var(--font-ui);
+}
+
+.sidebar-brand-name {
+    font-size: 1.18rem;
+    font-weight: 600;
+}
+
+.sidebar-brand-subtitle {
+    font-size: 0.92rem;
+    color: var(--text-secondary);
+    font-family: var(--font-ui);
+}
+
+.chat-wrapper {
+    background: var(--surface-card);
+    border-radius: 28px;
+    padding: 1.75rem 1.85rem 2.2rem;
+    box-shadow: var(--shadow-soft);
+    border: 1px solid var(--divider);
+    margin-bottom: 1.75rem;
+}
+
+.chat-header {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.6rem;
+    margin-bottom: 1.4rem;
+    text-align: center;
+}
+
+.chat-title-group h1 {
+    margin: 0;
+    font-size: 1.65rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.chat-title-group p {
+    margin: 0.15rem 0 0;
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+    font-family: var(--font-ui);
+}
+
+body[data-theme="dark"] .chat-title-group h1 {
+    color: #fff7e3;
+}
+
+body[data-theme="dark"] .chat-title-group p {
+    color: #e8dcc7;
+}
+
+.preview-pill {
+    background: var(--surface-muted);
+    color: var(--text-secondary);
+    border-radius: 999px;
+    padding: 0.35rem 0.9rem;
+    font-size: 0.75rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    font-family: var(--font-ui);
+}
+
+.trust-panel {
+    display: none;
+}
+
+.chat-scroll {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    max-height: min(64vh, 640px);
+    overflow-y: auto;
+}
+
+.stChatMessage {
+    background: transparent !important;
+    padding: 0 !important;
+}
+
+.stChatMessage[data-testid="stChatMessage-Assistant"] > div {
+    background: rgba(255, 255, 255, 0.85);
+    border-radius: 18px;
+    padding: 0.95rem 1.2rem;
+    border: 1px solid var(--divider);
+    box-shadow: var(--shadow-light);
+    max-width: 90%;
+}
+
+.stChatMessage[data-testid="stChatMessage-User"] > div {
+    background: rgba(75, 46, 5, 0.14);
+    border-radius: 18px;
+    padding: 0.9rem 1.15rem;
+    border: 1px solid rgba(75, 46, 5, 0.22);
+    box-shadow: var(--shadow-light);
+    max-width: 90%;
+    margin-left: auto;
+}
+
+body[data-theme="dark"] .stChatMessage[data-testid="stChatMessage-Assistant"] > div {
+    background: rgba(40, 33, 27, 0.9);
+}
+
+body[data-theme="dark"] .stChatMessage[data-testid="stChatMessage-User"] > div {
+    background: rgba(216, 176, 121, 0.12);
+    border-color: rgba(216, 176, 121, 0.22);
+}
+
+.stChatInput {
+    background: var(--surface-card);
+    border-radius: 22px;
+    box-shadow: var(--shadow-soft);
+    padding: 1rem 1.25rem 1.35rem;
+    border: 1px solid var(--divider);
+}
+
+.stChatInput textarea {
+    background: var(--input-bg) !important;
+    border: 1px solid var(--input-border) !important;
+    border-radius: 14px !important;
+    padding: 0.85rem 1rem !important;
+    color: var(--text-primary) !important;
+    font-family: var(--font-ui) !important;
+}
+
+.stChatInput textarea:focus-visible {
+    border-color: var(--accent) !important;
+    box-shadow: 0 0 0 3px var(--accent-soft) !important;
+}
+
+.stChatInput button[data-testid="baseButton-secondary"] {
+    background: var(--accent) !important;
+    color: var(--inverse-text) !important;
+    border-radius: 999px !important;
+    border: none !important;
+    padding: 0 1.6rem !important;
+    font-weight: 600 !important;
+    font-family: var(--font-ui) !important;
+    box-shadow: var(--shadow-light);
+}
+
+.stChatInput button[data-testid="baseButton-secondary"]:hover,
+.stChatInput button[data-testid="baseButton-secondary"]:focus-visible {
+    background: var(--accent-hover) !important;
+}
+
+.stChatInput button[data-testid="baseButton-secondary"] svg {
+    display: none;
+}
+
+.doctrinal-footer {
+    margin-top: 1.4rem;
+    font-size: 0.82rem;
+    font-style: italic;
+    color: var(--text-muted);
+    text-align: center;
+    font-family: var(--font-ui);
+}
+
+@media (max-width: 900px) {
+    main .block-container {
+        padding: 1.2rem 1rem 6.5rem;
+    }
+    .chat-wrapper {
+        border-radius: 22px;
+        padding: 1.35rem 1.2rem 2rem;
+    }
+    .chat-header {
+        flex-direction: column;
+        gap: 0.65rem;
+    }
+    .stChatInput {
+        position: fixed;
+        left: 0.75rem;
+        right: 0.75rem;
+        bottom: 1rem;
+        margin: 0;
+        z-index: 50;
+    }
+}
+</style>
 """, unsafe_allow_html=True)
 
 
@@ -1200,34 +1477,6 @@ def _initialize_ui_state() -> None:
         st.session_state.conversation_archive = {}
     if "show_about_modal" not in st.session_state:
         st.session_state.show_about_modal = False
-    if "sidebar_open" not in st.session_state:
-        st.session_state.sidebar_open = False
-
-
-def _sync_sidebar_body_class() -> None:
-    class_name = "sidebar-open" if st.session_state.get("sidebar_open") else ""
-    st.markdown(
-        f"""
-        <script>
-        try {{
-            const body = window.parent?.document?.body || window.document.body;
-            if (!body) {{
-                return;
-            }}
-            if (window.innerWidth > 900) {{
-                body.classList.remove("sidebar-open");
-            }}
-            body.classList.remove("sidebar-open");
-            if ("{class_name}" === "sidebar-open") {{
-                body.classList.add("sidebar-open");
-            }}
-        }} catch (error) {{
-            // graceful no-op if we cannot reach the parent body
-        }}
-        </script>
-        """,
-        unsafe_allow_html=True,
-    )
 
 
 def reset_conversation() -> None:
@@ -1235,8 +1484,7 @@ def reset_conversation() -> None:
     st.session_state.last_question = None
     st.session_state.last_submission_time = 0.0
     st.session_state.last_activity = time.time()
-    st.session_state.pop("desktop_user_input", None)
-    st.session_state.pop("mobile_user_input", None)
+    st.session_state.pop("user_input", None)
 
 
 def update_recent_questions(question: str) -> None:
@@ -1261,7 +1509,6 @@ def load_conversation_from_recent(question: str) -> None:
         st.session_state.chat_history = []
     st.session_state.last_question = None
     st.session_state.last_submission_time = 0.0
-    st.session_state.sidebar_open = False
 
 
 def _format_recent_question_label(question: str) -> str:
@@ -1295,12 +1542,8 @@ def render_about_modal() -> None:
         st.session_state.show_about_modal = False
 
 
-def render_sidebar_content(view: str) -> None:
-    with st.container():
-        st.markdown(
-            f'<div class="sidebar-panel sidebar-panel-{view}">',
-            unsafe_allow_html=True,
-        )
+def render_sidebar() -> None:
+    with st.sidebar:
         st.markdown(
             """
             <div class="sidebar-brand">
@@ -1315,21 +1558,12 @@ def render_sidebar_content(view: str) -> None:
             unsafe_allow_html=True,
         )
 
-        if st.button(
-            "New Chat",
-            key=f"{view}_sidebar_new_chat",
-            type="primary",
-            use_container_width=True,
-        ):
+        if st.button("New Chat", key="sidebar_new_chat", type="primary", use_container_width=True):
             reset_conversation()
-            st.session_state.sidebar_open = False
             st.toast("🕊️ Conversation cleared. Ready for a new question.")
             st.experimental_rerun()
 
-        st.markdown(
-            "<div class='sidebar-section-title'>Recent Questions</div>",
-            unsafe_allow_html=True,
-        )
+        st.markdown("<div class='sidebar-section-title'>Recent Questions</div>", unsafe_allow_html=True)
 
         recent_questions = st.session_state.get("recent_questions", [])
         if not recent_questions:
@@ -1339,27 +1573,22 @@ def render_sidebar_content(view: str) -> None:
                 label = _format_recent_question_label(question)
                 if st.button(
                     label,
-                    key=f"{view}_recent_question_{idx}",
+                    key=f"recent_question_{idx}",
                     type="secondary",
                     use_container_width=True,
                 ):
                     load_conversation_from_recent(question)
                     st.experimental_rerun()
 
-        st.markdown(
-            "<div class='sidebar-section-title'>Guidance</div>",
-            unsafe_allow_html=True,
-        )
+        st.markdown("<div class='sidebar-section-title'>Guidance</div>", unsafe_allow_html=True)
         if st.button(
             "About & Guidance",
-            key=f"{view}_open_about_modal",
+            key="open_about_modal",
             type="secondary",
             use_container_width=True,
         ):
             st.session_state.show_about_modal = True
             st.experimental_rerun()
-
-        st.markdown("</div>", unsafe_allow_html=True)
 
 
 def render_trust_panel() -> None:
@@ -1377,43 +1606,18 @@ def render_trust_panel() -> None:
     )
 
 
-def render_main_header(view: str) -> None:
-    if view == "desktop" and st.session_state.get("sidebar_open"):
-        st.session_state.sidebar_open = False
-    with st.container():
-        st.markdown('<div class="chat-header-shell">', unsafe_allow_html=True)
-        col_left, col_right = st.columns([7, 3], gap="medium")
-        with col_left:
-            btn_col, title_col = st.columns([1, 9], gap="small")
-            with btn_col:
-                st.markdown('<div class="hamburger-flag"></div>', unsafe_allow_html=True)
-                if st.button("☰", key=f"{view}_toggle_sidebar", type="secondary"):
-                    st.session_state.sidebar_open = not st.session_state.get(
-                        "sidebar_open", False
-                    )
-            with title_col:
-                st.markdown(
-                    """
-                    <div class="chat-title-group">
-                        <h1>The Christian Project</h1>
-                        <p>Faithful answers for curious hearts.</p>
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
-        with col_right:
-            st.markdown('<div class="chat-header-actions">', unsafe_allow_html=True)
-            st.markdown('<div class="header-mobile-only">', unsafe_allow_html=True)
-            if st.button("New Chat", key=f"{view}_header_new_chat", type="secondary"):
-                reset_conversation()
-                st.session_state.sidebar_open = False
-                st.toast("🕊️ Conversation cleared. Ready for a new question.")
-                st.experimental_rerun()
-            st.markdown("</div>", unsafe_allow_html=True)
-            st.markdown('<div class="preview-pill">Preview Build</div>', unsafe_allow_html=True)
-            st.markdown("</div>", unsafe_allow_html=True)
-        st.markdown("</div>", unsafe_allow_html=True)
-    _sync_sidebar_body_class()
+def render_main_header() -> None:
+    st.markdown(
+        """
+        <div class="chat-header">
+            <div class="chat-title-group">
+                <h1>The Christian Project</h1>
+                <p>Faithful answers for curious hearts.</p>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 def render_doctrinal_footer() -> None:
@@ -1423,48 +1627,9 @@ def render_doctrinal_footer() -> None:
     )
 
 
-def render_chat_panel(view: str) -> Optional[str]:
-    with st.container():
-        st.markdown(
-            f'<div class="chat-panel chat-panel-{view}">',
-            unsafe_allow_html=True,
-        )
-        st.markdown('<div class="chat-wrapper">', unsafe_allow_html=True)
-        render_main_header(view)
-        render_trust_panel()
-        display_chat_history(view)
-        render_doctrinal_footer()
-        st.markdown("</div>", unsafe_allow_html=True)
-        st.markdown('<div class="chat-input-region">', unsafe_allow_html=True)
-        user_input = st.chat_input(
-            "Ask a theological question...", key=f"{view}_user_input"
-        )
-        st.markdown("</div>", unsafe_allow_html=True)
-        st.markdown("</div>", unsafe_allow_html=True)
-    return user_input
-
-
-def render_desktop_view() -> Optional[str]:
-    with st.container():
-        st.markdown('<div class="app-shell desktop-view">', unsafe_allow_html=True)
-        render_sidebar_content("desktop")
-        user_input = render_chat_panel("desktop")
-        st.markdown("</div>", unsafe_allow_html=True)
-    return user_input
-
-
-def render_mobile_view() -> Optional[str]:
-    with st.container():
-        st.markdown('<div class="app-shell mobile-view">', unsafe_allow_html=True)
-        render_sidebar_content("mobile")
-        user_input = render_chat_panel("mobile")
-        st.markdown("</div>", unsafe_allow_html=True)
-    return user_input
-
-
-def display_chat_history(view: str) -> None:
+def display_chat_history() -> None:
     st.markdown(
-        f'<div id="chat-scroll-region-{view}" class="chat-scroll" role="log" aria-live="polite" aria-label="Conversation transcript">',
+        '<div id="chat-scroll-region-main" class="chat-scroll" role="log" aria-live="polite" aria-label="Conversation transcript">',
         unsafe_allow_html=True,
     )
     for idx, message in enumerate(st.session_state.get("chat_history", [])):
@@ -1524,7 +1689,7 @@ def display_chat_history(view: str) -> None:
             with col1:
                 if st.button(
                     "👍 Helpful",
-                    key=f"{view}_feedback_pos_{idx}",
+                    key=f"feedback_pos_{idx}",
                     use_container_width=True,
                 ):
                     record_feedback(
@@ -1536,7 +1701,7 @@ def display_chat_history(view: str) -> None:
             with col2:
                 if st.button(
                     "👎 Needs Review",
-                    key=f"{view}_feedback_neg_{idx}",
+                    key=f"feedback_neg_{idx}",
                     use_container_width=True,
                 ):
                     record_feedback(
@@ -1548,15 +1713,15 @@ def display_chat_history(view: str) -> None:
 
     st.markdown("</div>", unsafe_allow_html=True)
     st.markdown(
-        f"""
+        """
         <script>
-        (function() {{
+        (function() {
             const doc = window.parent?.document || document;
-            const region = doc.getElementById("chat-scroll-region-{view}");
-            if (region) {{
+            const region = doc.getElementById("chat-scroll-region-main");
+            if (region) {
                 region.scrollTop = region.scrollHeight;
-            }}
-        }})();
+            }
+        })();
         </script>
         """,
         unsafe_allow_html=True,
@@ -1692,15 +1857,23 @@ def run_chat_interface() -> None:
         st.toast("🧹 Conversation cleared", icon="🕊️")
     st.session_state.last_activity = time.time()
 
-    desktop_input = render_desktop_view()
-    mobile_input = render_mobile_view()
+    render_sidebar()
 
-    user_input = desktop_input or mobile_input
+    with st.container():
+        st.markdown('<div class="chat-wrapper">', unsafe_allow_html=True)
+        render_main_header()
+        render_trust_panel()
+        display_chat_history()
+        render_doctrinal_footer()
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    user_input = st.chat_input(
+        "Ask a theological question...", key="user_input"
+    )
 
     if user_input:
         process_input(user_input)
-        st.session_state.pop("desktop_user_input", None)
-        st.session_state.pop("mobile_user_input", None)
+        st.session_state.pop("user_input", None)
         if hasattr(st, "rerun"):
             st.rerun()
         else:
@@ -1712,7 +1885,7 @@ def run_chat_interface() -> None:
 try:
     run_chat_interface()
     logging.info(
-        "System update complete. Mobile and desktop views separated into distinct render states. Overlapping UI eliminated and responsive behavior verified."
+        "System update complete. Unified responsive layout restored for MVP showcase with refreshed styling and stable sidebar/header behavior."
     )
 except Exception as exc:
     logging.exception("Unhandled error in interface: %s", exc)

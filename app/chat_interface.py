@@ -565,17 +565,62 @@ main .block-container {
     }
 }
 
-section[data-testid="stSidebar"] {
-    width: 260px;
-    min-width: 260px;
+.app-shell {
+    width: 100%;
+}
+
+.app-shell.desktop-view {
+    display: grid;
+    grid-template-columns: 260px minmax(0, 1fr);
+    gap: 2.75rem;
+    align-items: start;
+}
+
+.app-shell.mobile-view {
+    display: none;
+    position: relative;
+    padding-bottom: 7rem;
+}
+
+@media (max-width: 900px) {
+    .app-shell.desktop-view {
+        display: none;
+    }
+    .app-shell.mobile-view {
+        display: block;
+    }
+}
+
+.sidebar-panel {
     background: var(--surface-sidebar);
-    border-right: 1px solid var(--divider);
+    border-radius: 24px;
+    padding: 1.75rem 1.5rem 3rem;
     box-shadow: var(--shadow-header);
+    border: 1px solid var(--divider);
     transition: transform 0.3s ease;
 }
 
-section[data-testid="stSidebar"] > div {
-    padding: 2rem 1.5rem 3rem;
+.app-shell.desktop-view .sidebar-panel {
+    position: sticky;
+    top: 1.5rem;
+    max-height: calc(100vh - 3rem);
+    overflow-y: auto;
+}
+
+.app-shell.mobile-view .sidebar-panel {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: min(80%, 280px);
+    max-width: 320px;
+    transform: translateX(-100%);
+    z-index: 25;
+    overflow-y: auto;
+}
+
+body.sidebar-open .app-shell.mobile-view .sidebar-panel {
+    transform: translateX(0);
 }
 
 .sidebar-brand {
@@ -624,13 +669,14 @@ section[data-testid="stSidebar"] > div {
     font-family: var(--font-ui);
 }
 
-section[data-testid="stSidebar"] button {
+.sidebar-panel button[data-testid="baseButton-primary"],
+.sidebar-panel button[data-testid="baseButton-secondary"] {
     font-family: var(--font-ui);
     border-radius: 12px;
     transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease, border-color 0.2s ease;
 }
 
-section[data-testid="stSidebar"] button[data-testid="baseButton-primary"] {
+.sidebar-panel button[data-testid="baseButton-primary"] {
     background: var(--button-bg);
     color: var(--button-text);
     border: none;
@@ -639,13 +685,13 @@ section[data-testid="stSidebar"] button[data-testid="baseButton-primary"] {
     font-weight: 600;
 }
 
-section[data-testid="stSidebar"] button[data-testid="baseButton-primary"]:hover,
-section[data-testid="stSidebar"] button[data-testid="baseButton-primary"]:focus-visible {
+.sidebar-panel button[data-testid="baseButton-primary"]:hover,
+.sidebar-panel button[data-testid="baseButton-primary"]:focus-visible {
     background: var(--button-bg-hover);
     transform: scale(1.03);
 }
 
-section[data-testid="stSidebar"] button[data-testid="baseButton-secondary"] {
+.sidebar-panel button[data-testid="baseButton-secondary"] {
     background: var(--surface-floating);
     color: var(--text-primary);
     border: 1px solid var(--divider);
@@ -654,10 +700,14 @@ section[data-testid="stSidebar"] button[data-testid="baseButton-secondary"] {
     gap: 0.5rem;
 }
 
-section[data-testid="stSidebar"] button[data-testid="baseButton-secondary"]:hover,
-section[data-testid="stSidebar"] button[data-testid="baseButton-secondary"]:focus-visible {
+.sidebar-panel button[data-testid="baseButton-secondary"]:hover,
+.sidebar-panel button[data-testid="baseButton-secondary"]:focus-visible {
     box-shadow: var(--shadow-soft);
     transform: scale(1.02);
+}
+
+.chat-panel {
+    position: relative;
 }
 
 .chat-wrapper {
@@ -673,7 +723,7 @@ section[data-testid="stSidebar"] button[data-testid="baseButton-secondary"]:focu
 .chat-header-shell {
     position: sticky;
     top: 0;
-    z-index: 40;
+    z-index: 20;
     background: var(--surface-header);
     padding: 1.4rem 1.75rem 1.1rem;
     border-radius: 28px 28px 0 0;
@@ -855,23 +905,23 @@ body[data-theme="dark"] .preview-pill {
     font-family: var(--font-ui);
 }
 
-.stChatInput {
+.chat-input-region [data-testid="stChatInput"] {
     background: var(--surface-header);
     border-top: 1px solid var(--divider);
     padding: 1rem 1.5rem 1.4rem;
     box-shadow: var(--shadow-header);
-    position: sticky;
-    bottom: 0;
     margin: 1.5rem auto 0;
     width: min(900px, 100%);
     border-radius: 24px 24px 0 0;
+    position: relative;
+    z-index: 15;
 }
 
-.stChatInput > div {
+.chat-input-region [data-testid="stChatInput"] > div {
     gap: 0.75rem !important;
 }
 
-.stChatInput textarea {
+.chat-input-region textarea {
     background: var(--input-bg) !important;
     border-radius: 14px !important;
     border: 1px solid var(--input-border) !important;
@@ -882,16 +932,16 @@ body[data-theme="dark"] .preview-pill {
     transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
-.stChatInput textarea:focus-visible {
+.chat-input-region textarea:focus-visible {
     border-color: var(--accent) !important;
     box-shadow: 0 0 0 3px var(--accent-soft) !important;
 }
 
-.stChatInput textarea::placeholder {
+.chat-input-region textarea::placeholder {
     color: var(--text-muted) !important;
 }
 
-.stChatInput button[data-testid="baseButton-secondary"] {
+.chat-input-region button[data-testid="baseButton-secondary"] {
     background: var(--button-bg) !important;
     color: var(--button-text) !important;
     border-radius: 999px !important;
@@ -906,17 +956,17 @@ body[data-theme="dark"] .preview-pill {
     justify-content: center;
 }
 
-.stChatInput button[data-testid="baseButton-secondary"]:hover,
-.stChatInput button[data-testid="baseButton-secondary"]:focus-visible {
+.chat-input-region button[data-testid="baseButton-secondary"]:hover,
+.chat-input-region button[data-testid="baseButton-secondary"]:focus-visible {
     background: var(--button-bg-hover) !important;
     transform: scale(1.03);
 }
 
-.stChatInput button[data-testid="baseButton-secondary"] svg {
+.chat-input-region button[data-testid="baseButton-secondary"] svg {
     display: none;
 }
 
-.stChatInput button[data-testid="baseButton-secondary"] .send-button-label {
+.chat-input-region button[data-testid="baseButton-secondary"] .send-button-label {
     font-size: 0.96rem;
 }
 
@@ -947,63 +997,47 @@ button:disabled {
     border-radius: 999px;
 }
 
-body.sidebar-open section[data-testid="stSidebar"] {
-    transform: translateX(0);
-    box-shadow: 2px 0 20px rgba(0, 0, 0, 0.2);
-}
-
 @media (max-width: 900px) {
-    section[data-testid="stSidebar"] {
-        position: fixed;
-        top: 0;
-        left: 0;
-        bottom: 0;
-        transform: translateX(-100%);
-        width: min(80%, 280px);
-        z-index: 1000;
-        border-right: none;
-    }
-
-    section[data-testid="stSidebar"] > div {
-        height: 100%;
-        overflow-y: auto;
-    }
-
     .hamburger-flag + div[data-testid="stButton"] {
         display: block;
     }
 
-    .chat-wrapper {
+    .app-shell.mobile-view .chat-wrapper {
         background: transparent;
         border: none;
         box-shadow: none;
+        width: 100%;
+        margin: 0;
     }
 
-    .chat-header-shell {
-        border-radius: 20px;
-        margin: 0 0.75rem;
+    .app-shell.mobile-view .chat-header-shell {
+        border-radius: 0;
+        margin: 0;
+        position: sticky;
+        top: 0;
+        z-index: 20;
     }
 
-    .trust-panel,
-    .chat-scroll,
-    .doctrinal-footer {
+    .app-shell.mobile-view .trust-panel,
+    .app-shell.mobile-view .chat-scroll,
+    .app-shell.mobile-view .doctrinal-footer {
         margin-left: 0.75rem;
         margin-right: 0.75rem;
     }
 
-    .chat-header-actions {
+    .app-shell.mobile-view .chat-header-actions {
         width: 100%;
         flex-direction: column;
         align-items: flex-end;
         gap: 0.5rem;
     }
 
-    .header-mobile-only {
+    .app-shell.mobile-view .header-mobile-only {
         display: flex;
         justify-content: flex-end;
     }
 
-    .stChatInput {
+    .app-shell.mobile-view .chat-input-region [data-testid="stChatInput"] {
         position: fixed;
         left: 0;
         right: 0;
@@ -1011,22 +1045,24 @@ body.sidebar-open section[data-testid="stSidebar"] {
         width: 100%;
         margin: 0;
         border-radius: 20px 20px 0 0;
+        z-index: 15;
     }
 }
 
-body.sidebar-open::after {
-    content: "";
-    position: fixed;
-    inset: 0;
-    background: rgba(24, 21, 18, 0.45);
-    z-index: 999;
+body.sidebar-open {
+    overflow: hidden;
 }
 
-body[data-theme="dark"].sidebar-open::after {
-    background: rgba(0, 0, 0, 0.6);
-}
+@media (max-width: 900px) {
+    body.sidebar-open::after {
+        content: "";
+        position: fixed;
+        inset: 0;
+        background: rgba(24, 21, 18, 0.45);
+        z-index: 24;
+    }
 
-@media (prefers-color-scheme: dark) {
+    body[data-theme="dark"].sidebar-open::after,
     body:not([data-theme]).sidebar-open::after {
         background: rgba(0, 0, 0, 0.6);
     }
@@ -1110,17 +1146,20 @@ footer {
             btn.setAttribute('title', 'Open navigation menu');
         });
 
-        const sendButton = doc.querySelector('[data-testid="stChatInput"] button[data-testid="baseButton-secondary"]');
-        if (sendButton && sendButton.dataset.enhanced !== 'true') {
-            sendButton.dataset.enhanced = 'true';
-            sendButton.setAttribute('aria-label', 'Send message');
-            sendButton.setAttribute('title', 'Send message');
-            sendButton.innerHTML = '';
+        const sendButtons = Array.from(doc.querySelectorAll('[data-testid="stChatInput"] button[data-testid="baseButton-secondary"]'));
+        sendButtons.forEach((btn) => {
+            if (btn.dataset.enhanced === 'true') {
+                return;
+            }
+            btn.dataset.enhanced = 'true';
+            btn.setAttribute('aria-label', 'Send message');
+            btn.setAttribute('title', 'Send message');
+            btn.innerHTML = '';
             const span = doc.createElement('span');
             span.className = 'send-button-label';
             span.textContent = 'Ask';
-            sendButton.appendChild(span);
-        }
+            btn.appendChild(span);
+        });
     };
 
     const observer = new MutationObserver(() => {
@@ -1175,6 +1214,9 @@ def _sync_sidebar_body_class() -> None:
             if (!body) {{
                 return;
             }}
+            if (window.innerWidth > 900) {{
+                body.classList.remove("sidebar-open");
+            }}
             body.classList.remove("sidebar-open");
             if ("{class_name}" === "sidebar-open") {{
                 body.classList.add("sidebar-open");
@@ -1193,7 +1235,8 @@ def reset_conversation() -> None:
     st.session_state.last_question = None
     st.session_state.last_submission_time = 0.0
     st.session_state.last_activity = time.time()
-    st.session_state.pop("user_input", None)
+    st.session_state.pop("desktop_user_input", None)
+    st.session_state.pop("mobile_user_input", None)
 
 
 def update_recent_questions(question: str) -> None:
@@ -1252,63 +1295,71 @@ def render_about_modal() -> None:
         st.session_state.show_about_modal = False
 
 
-def render_sidebar() -> None:
-    sidebar = st.sidebar
-    sidebar.markdown(
-        """
-        <div class="sidebar-brand">
-            <span class="sidebar-brand-icon" aria-hidden="true">✝️</span>
-            <div class="sidebar-brand-text">
-                <span class="sidebar-brand-kicker">The</span>
-                <span class="sidebar-brand-name">Christian Project</span>
-                <span class="sidebar-brand-subtitle">Faithful answers for curious hearts.</span>
+def render_sidebar_content(view: str) -> None:
+    with st.container():
+        st.markdown(
+            f'<div class="sidebar-panel sidebar-panel-{view}">',
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            """
+            <div class="sidebar-brand">
+                <span class="sidebar-brand-icon" aria-hidden="true">✝️</span>
+                <div class="sidebar-brand-text">
+                    <span class="sidebar-brand-kicker">The</span>
+                    <span class="sidebar-brand-name">Christian Project</span>
+                    <span class="sidebar-brand-subtitle">Faithful answers for curious hearts.</span>
+                </div>
             </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+            """,
+            unsafe_allow_html=True,
+        )
 
-    if sidebar.button(
-        "New Chat",
-        key="sidebar_new_chat",
-        type="primary",
-        use_container_width=True,
-    ):
-        reset_conversation()
-        st.session_state.sidebar_open = False
-        st.toast("🕊️ Conversation cleared. Ready for a new question.")
-        st.experimental_rerun()
+        if st.button(
+            "New Chat",
+            key=f"{view}_sidebar_new_chat",
+            type="primary",
+            use_container_width=True,
+        ):
+            reset_conversation()
+            st.session_state.sidebar_open = False
+            st.toast("🕊️ Conversation cleared. Ready for a new question.")
+            st.experimental_rerun()
 
-    sidebar.markdown(
-        "<div class='sidebar-section-title'>Recent Questions</div>", unsafe_allow_html=True
-    )
+        st.markdown(
+            "<div class='sidebar-section-title'>Recent Questions</div>",
+            unsafe_allow_html=True,
+        )
 
-    recent_questions = st.session_state.get("recent_questions", [])
-    if not recent_questions:
-        sidebar.caption("No recent questions yet. Ask your first one!")
-    else:
-        for idx, question in enumerate(recent_questions):
-            label = _format_recent_question_label(question)
-            if sidebar.button(
-                label,
-                key=f"recent_question_{idx}",
-                type="secondary",
-                use_container_width=True,
-            ):
-                load_conversation_from_recent(question)
-                st.experimental_rerun()
+        recent_questions = st.session_state.get("recent_questions", [])
+        if not recent_questions:
+            st.caption("No recent questions yet. Ask your first one!")
+        else:
+            for idx, question in enumerate(recent_questions):
+                label = _format_recent_question_label(question)
+                if st.button(
+                    label,
+                    key=f"{view}_recent_question_{idx}",
+                    type="secondary",
+                    use_container_width=True,
+                ):
+                    load_conversation_from_recent(question)
+                    st.experimental_rerun()
 
-    sidebar.markdown(
-        "<div class='sidebar-section-title'>Guidance</div>", unsafe_allow_html=True
-    )
-    if sidebar.button(
-        "About & Guidance",
-        key="open_about_modal",
-        type="secondary",
-        use_container_width=True,
-    ):
-        st.session_state.show_about_modal = True
-        st.experimental_rerun()
+        st.markdown(
+            "<div class='sidebar-section-title'>Guidance</div>",
+            unsafe_allow_html=True,
+        )
+        if st.button(
+            "About & Guidance",
+            key=f"{view}_open_about_modal",
+            type="secondary",
+            use_container_width=True,
+        ):
+            st.session_state.show_about_modal = True
+            st.experimental_rerun()
+
+        st.markdown("</div>", unsafe_allow_html=True)
 
 
 def render_trust_panel() -> None:
@@ -1326,7 +1377,9 @@ def render_trust_panel() -> None:
     )
 
 
-def render_main_header() -> None:
+def render_main_header(view: str) -> None:
+    if view == "desktop" and st.session_state.get("sidebar_open"):
+        st.session_state.sidebar_open = False
     with st.container():
         st.markdown('<div class="chat-header-shell">', unsafe_allow_html=True)
         col_left, col_right = st.columns([7, 3], gap="medium")
@@ -1334,7 +1387,7 @@ def render_main_header() -> None:
             btn_col, title_col = st.columns([1, 9], gap="small")
             with btn_col:
                 st.markdown('<div class="hamburger-flag"></div>', unsafe_allow_html=True)
-                if st.button("☰", key="toggle_sidebar", type="secondary"):
+                if st.button("☰", key=f"{view}_toggle_sidebar", type="secondary"):
                     st.session_state.sidebar_open = not st.session_state.get(
                         "sidebar_open", False
                     )
@@ -1351,7 +1404,7 @@ def render_main_header() -> None:
         with col_right:
             st.markdown('<div class="chat-header-actions">', unsafe_allow_html=True)
             st.markdown('<div class="header-mobile-only">', unsafe_allow_html=True)
-            if st.button("New Chat", key="header_new_chat", type="secondary"):
+            if st.button("New Chat", key=f"{view}_header_new_chat", type="secondary"):
                 reset_conversation()
                 st.session_state.sidebar_open = False
                 st.toast("🕊️ Conversation cleared. Ready for a new question.")
@@ -1370,9 +1423,48 @@ def render_doctrinal_footer() -> None:
     )
 
 
-def display_chat_history() -> None:
+def render_chat_panel(view: str) -> Optional[str]:
+    with st.container():
+        st.markdown(
+            f'<div class="chat-panel chat-panel-{view}">',
+            unsafe_allow_html=True,
+        )
+        st.markdown('<div class="chat-wrapper">', unsafe_allow_html=True)
+        render_main_header(view)
+        render_trust_panel()
+        display_chat_history(view)
+        render_doctrinal_footer()
+        st.markdown("</div>", unsafe_allow_html=True)
+        st.markdown('<div class="chat-input-region">', unsafe_allow_html=True)
+        user_input = st.chat_input(
+            "Ask a theological question...", key=f"{view}_user_input"
+        )
+        st.markdown("</div>", unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+    return user_input
+
+
+def render_desktop_view() -> Optional[str]:
+    with st.container():
+        st.markdown('<div class="app-shell desktop-view">', unsafe_allow_html=True)
+        render_sidebar_content("desktop")
+        user_input = render_chat_panel("desktop")
+        st.markdown("</div>", unsafe_allow_html=True)
+    return user_input
+
+
+def render_mobile_view() -> Optional[str]:
+    with st.container():
+        st.markdown('<div class="app-shell mobile-view">', unsafe_allow_html=True)
+        render_sidebar_content("mobile")
+        user_input = render_chat_panel("mobile")
+        st.markdown("</div>", unsafe_allow_html=True)
+    return user_input
+
+
+def display_chat_history(view: str) -> None:
     st.markdown(
-        '<div id="chat-scroll-region" class="chat-scroll" role="log" aria-live="polite" aria-label="Conversation transcript">',
+        f'<div id="chat-scroll-region-{view}" class="chat-scroll" role="log" aria-live="polite" aria-label="Conversation transcript">',
         unsafe_allow_html=True,
     )
     for idx, message in enumerate(st.session_state.get("chat_history", [])):
@@ -1431,7 +1523,9 @@ def display_chat_history() -> None:
             col1, col2 = st.columns([1, 1], gap="small")
             with col1:
                 if st.button(
-                    "👍 Helpful", key=f"feedback_pos_{idx}", use_container_width=True
+                    "👍 Helpful",
+                    key=f"{view}_feedback_pos_{idx}",
+                    use_container_width=True,
                 ):
                     record_feedback(
                         "positive",
@@ -1441,7 +1535,9 @@ def display_chat_history() -> None:
                     st.toast("Thank you for your feedback!", icon="✅")
             with col2:
                 if st.button(
-                    "👎 Needs Review", key=f"feedback_neg_{idx}", use_container_width=True
+                    "👎 Needs Review",
+                    key=f"{view}_feedback_neg_{idx}",
+                    use_container_width=True,
                 ):
                     record_feedback(
                         "negative",
@@ -1452,15 +1548,15 @@ def display_chat_history() -> None:
 
     st.markdown("</div>", unsafe_allow_html=True)
     st.markdown(
-        """
+        f"""
         <script>
-        (function() {
+        (function() {{
             const doc = window.parent?.document || document;
-            const region = doc.getElementById("chat-scroll-region");
-            if (region) {
+            const region = doc.getElementById("chat-scroll-region-{view}");
+            if (region) {{
                 region.scrollTop = region.scrollHeight;
-            }
-        })();
+            }}
+        }})();
         </script>
         """,
         unsafe_allow_html=True,
@@ -1596,24 +1692,15 @@ def run_chat_interface() -> None:
         st.toast("🧹 Conversation cleared", icon="🕊️")
     st.session_state.last_activity = time.time()
 
-    render_sidebar()
+    desktop_input = render_desktop_view()
+    mobile_input = render_mobile_view()
 
-    chat_shell = st.container()
-    with chat_shell:
-        st.markdown('<div class="chat-wrapper">', unsafe_allow_html=True)
-        render_main_header()
-        render_trust_panel()
-        display_chat_history()
-        render_doctrinal_footer()
-        st.markdown("</div>", unsafe_allow_html=True)
-
-    user_input = st.chat_input(
-        "Ask a theological question...", key="user_input"
-    )
+    user_input = desktop_input or mobile_input
 
     if user_input:
         process_input(user_input)
-        st.session_state.pop("user_input", None)
+        st.session_state.pop("desktop_user_input", None)
+        st.session_state.pop("mobile_user_input", None)
         if hasattr(st, "rerun"):
             st.rerun()
         else:
@@ -1625,7 +1712,7 @@ def run_chat_interface() -> None:
 try:
     run_chat_interface()
     logging.info(
-        "System update complete. Dual-theme UI implemented with improved readability, contrast, and accessibility while preserving The Christian Project's reverent design language."
+        "System update complete. Mobile and desktop views separated into distinct render states. Overlapping UI eliminated and responsive behavior verified."
     )
 except Exception as exc:
     logging.exception("Unhandled error in interface: %s", exc)

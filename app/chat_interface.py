@@ -1455,24 +1455,9 @@ RETRIEVAL_UNAVAILABLE_MSG = (
     "The retrieval system is temporarily unavailable. Please check your setup or try again later."
 )
 
-RECENT_QUESTIONS_LIMIT = 8
-DEFAULT_RECENT_QUESTIONS = [
-    "How do Lutherans understand grace alone?",
-    "What comfort does baptism give me?",
-    "Why do we confess our sins each week?",
-    "How should I pray when I'm anxious?",
-    "What is the role of the pastor in spiritual care?",
-    "How can I discern God's will in daily decisions?",
-    "What does Scripture say about suffering faithfully?",
-    "How is Holy Communion a means of grace?",
-]
-
-
 def _initialize_ui_state() -> None:
     if "chat_history" not in st.session_state:
         st.session_state.chat_history = []
-    if "recent_questions" not in st.session_state:
-        st.session_state.recent_questions = DEFAULT_RECENT_QUESTIONS[:RECENT_QUESTIONS_LIMIT]
     if "conversation_archive" not in st.session_state:
         st.session_state.conversation_archive = {}
     if "show_about_modal" not in st.session_state:
@@ -1485,30 +1470,6 @@ def reset_conversation() -> None:
     st.session_state.last_submission_time = 0.0
     st.session_state.last_activity = time.time()
     st.session_state.pop("user_input", None)
-
-
-def update_recent_questions(question: str) -> None:
-    if not question:
-        return
-    recents = [
-        item for item in st.session_state.get("recent_questions", []) if item != question
-    ]
-    recents.insert(0, question)
-    st.session_state.recent_questions = recents[:RECENT_QUESTIONS_LIMIT]
-    archive = st.session_state.get("conversation_archive", {})
-    archive[question] = copy.deepcopy(st.session_state.chat_history)
-    st.session_state.conversation_archive = archive
-
-
-def load_conversation_from_recent(question: str) -> None:
-    archive = st.session_state.get("conversation_archive", {})
-    conversation = archive.get(question)
-    if conversation:
-        st.session_state.chat_history = copy.deepcopy(conversation)
-    else:
-        st.session_state.chat_history = []
-    st.session_state.last_question = None
-    st.session_state.last_submission_time = 0.0
 
 
 def _format_recent_question_label(question: str) -> str:
@@ -1563,22 +1524,7 @@ def render_sidebar() -> None:
             st.toast("🕊️ Conversation cleared. Ready for a new question.")
             st.experimental_rerun()
 
-        st.markdown("<div class='sidebar-section-title'>Recent Questions</div>", unsafe_allow_html=True)
-
-        recent_questions = st.session_state.get("recent_questions", [])
-        if not recent_questions:
-            st.caption("No recent questions yet. Ask your first one!")
-        else:
-            for idx, question in enumerate(recent_questions):
-                label = _format_recent_question_label(question)
-                if st.button(
-                    label,
-                    key=f"recent_question_{idx}",
-                    type="secondary",
-                    use_container_width=True,
-                ):
-                    load_conversation_from_recent(question)
-                    st.experimental_rerun()
+        st.caption("Conversation history coming soon.")
 
         st.markdown("<div class='sidebar-section-title'>Guidance</div>", unsafe_allow_html=True)
         if st.button(
@@ -1838,7 +1784,6 @@ def process_input(user_input_raw: str) -> None:
     )
     st.session_state.chat_history.append(assistant_message)
     push_for_pastoral_review(user_input, assistant_message)
-    update_recent_questions(user_input)
     st.toast("✅ Response generated", icon="✨")
 
 

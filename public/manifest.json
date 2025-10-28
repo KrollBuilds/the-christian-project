@@ -1,0 +1,22 @@
+{
+  "name": "The Christian Project",
+  "short_name": "Christian Project",
+  "description": "Faithful answers for curious hearts.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f8f3eb",
+  "theme_color": "#4b2e05",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/icons/logo-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icons/logo-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

@@ -8,6 +8,7 @@ from __future__ import annotations
 # Developer toggle: st.session_state["developer_mode"] = True to show tonal metrics
 # TODO: Future Phase — Convert this Streamlit prototype into a FastAPI backend with REST endpoints for /query and /review.
 
+import base64
 import copy
 import itertools
 import json
@@ -20,6 +21,7 @@ from datetime import datetime, timezone
 import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+from io import BytesIO
 
 from dotenv import load_dotenv
 import requests
@@ -65,6 +67,164 @@ except Exception:
 from config import SETTINGS
 
 load_dotenv()
+
+PUBLIC_ASSETS_DIR = Path(PROJECT_ROOT) / "public"
+ICONS_DIR = PUBLIC_ASSETS_DIR / "icons"
+LOGO_32_PATH = ICONS_DIR / "logo-32.png"
+LOGO_192_PATH = ICONS_DIR / "logo-192.png"
+LOGO_512_PATH = ICONS_DIR / "logo-512.png"
+SERVICE_WORKER_PATH = PUBLIC_ASSETS_DIR / "service-worker.js"
+
+
+def _read_bytes(path: Path) -> Optional[bytes]:
+    try:
+        return path.read_bytes()
+    except FileNotFoundError:
+        return None
+
+
+def _to_data_uri(data: Optional[bytes]) -> Optional[str]:
+    if not data:
+        return None
+    encoded = base64.b64encode(data).decode("utf-8")
+    return f"data:image/png;base64,{encoded}"
+
+
+LOGO_32_BYTES = _read_bytes(LOGO_32_PATH)
+LOGO_192_BYTES = _read_bytes(LOGO_192_PATH)
+LOGO_512_BYTES = _read_bytes(LOGO_512_PATH)
+
+LOGO_SMALL_DATA_URI = _to_data_uri(LOGO_32_BYTES or LOGO_192_BYTES)
+LOGO_PRIMARY_DATA_URI = _to_data_uri(LOGO_192_BYTES)
+LOGO_LARGE_DATA_URI = _to_data_uri(LOGO_512_BYTES or LOGO_192_BYTES)
+
+
+def _page_icon() -> Any:
+    if LOGO_192_BYTES:
+        return BytesIO(LOGO_192_BYTES)
+    return "✝️"
+
+SERVICE_WORKER_INLINE = (
+    SERVICE_WORKER_PATH.read_text(encoding="utf-8") if SERVICE_WORKER_PATH.exists() else ""
+)
+
+PWA_ICON_PATHS = {
+    "favicon": "/icons/logo-32.png",
+    "icon_192": "/icons/logo-192.png",
+    "icon_512": "/icons/logo-512.png",
+    "manifest": "/manifest.json",
+    "service_worker": "/service-worker.js",
+}
+
+
+def _resolve_logo_src(size: str = "primary") -> str:
+    if size == "small":
+        return LOGO_SMALL_DATA_URI or PWA_ICON_PATHS["favicon"]
+    if size == "large":
+        return LOGO_LARGE_DATA_URI or PWA_ICON_PATHS["icon_512"]
+    return LOGO_PRIMARY_DATA_URI or PWA_ICON_PATHS["icon_192"]
+
+
+def inject_pwa_metadata() -> None:
+    """Ensure manifest, icons, and service worker registration are wired into the document head."""
+    if st.session_state.get("_tcp_pwa_metadata_injected"):
+        return
+    st.session_state["_tcp_pwa_metadata_injected"] = True
+
+    manifest_href = json.dumps(PWA_ICON_PATHS["manifest"])
+    icon32_href = json.dumps(PWA_ICON_PATHS["favicon"])
+    icon192_href = json.dumps(PWA_ICON_PATHS["icon_192"])
+    icon512_href = json.dumps(PWA_ICON_PATHS["icon_512"])
+    service_worker_href = json.dumps(PWA_ICON_PATHS["service_worker"])
+    inline_service_worker = (
+        json.dumps(SERVICE_WORKER_INLINE.strip())
+        if SERVICE_WORKER_INLINE.strip()
+        else "null"
+    )
+
+    script_template = """
+<script>
+(function() {
+    if (window.__tcpPwaInjected) {
+        return;
+    }
+    window.__tcpPwaInjected = true;
+    const head = document.head || document.getElementsByTagName('head')[0];
+    if (!head) {
+        return;
+    }
+    const linkDefinitions = [
+        { rel: 'manifest', href: __MANIFEST__ },
+        { rel: 'icon', href: __ICON32__, sizes: '32x32', type: 'image/png' },
+        { rel: 'icon', href: __ICON192__, sizes: '192x192', type: 'image/png' },
+        { rel: 'apple-touch-icon', href: __ICON512__, sizes: '512x512', type: 'image/png' }
+    ];
+    linkDefinitions.forEach((def) => {
+        if (!def.href) {
+            return;
+        }
+        const selector = `link[rel='${def.rel}'][href='${def.href}']`;
+        let link = head.querySelector(selector);
+        if (!link) {
+            link = document.createElement('link');
+            link.rel = def.rel;
+            head.appendChild(link);
+        }
+        if (def.href) {
+            link.href = def.href;
+        }
+        if (def.sizes) {
+            link.sizes = def.sizes;
+        }
+        if (def.type) {
+            link.type = def.type;
+        }
+    });
+    const metaPairs = [
+        ['theme-color', '#4b2e05'],
+        ['apple-mobile-web-app-capable', 'yes'],
+        ['apple-mobile-web-app-status-bar-style', 'black-translucent'],
+        ['apple-mobile-web-app-title', 'The Christian Project'],
+        ['description', 'Faithful answers for curious hearts.']
+    ];
+    metaPairs.forEach(([name, content]) => {
+        let meta = head.querySelector(`meta[name='${name}']`);
+        if (!meta) {
+            meta = document.createElement('meta');
+            meta.name = name;
+            head.appendChild(meta);
+        }
+        meta.content = content;
+    });
+    if ('serviceWorker' in navigator) {
+        const register = (url) => navigator.serviceWorker.register(url).catch((err) => {
+            console.warn('Service worker registration failed', url, err);
+            throw err;
+        });
+        register(__SERVICE_WORKER__).catch(() => {
+            const inlineSource = __INLINE_SERVICE_WORKER__;
+            if (!inlineSource) {
+                return;
+            }
+            const blob = new Blob([inlineSource], { type: 'text/javascript' });
+            register(URL.createObjectURL(blob)).catch((err) => {
+                console.warn('Fallback service worker registration failed', err);
+            });
+        });
+    }
+})();
+</script>
+    """
+    script = (
+        script_template
+        .replace("__MANIFEST__", manifest_href)
+        .replace("__ICON32__", icon32_href)
+        .replace("__ICON192__", icon192_href)
+        .replace("__ICON512__", icon512_href)
+        .replace("__SERVICE_WORKER__", service_worker_href)
+        .replace("__INLINE_SERVICE_WORKER__", inline_service_worker)
+    )
+    st.markdown(script, unsafe_allow_html=True)
 
 # ---------------------------------------------------------------------------
 # Configuration helpers
@@ -399,9 +559,10 @@ except Exception as exc:
     logging.exception("Failed to import retrieval utilities: %s", exc)
     st.set_page_config(
         page_title="The Christian Project",
-        page_icon="✝️",
+        page_icon=_page_icon(),
         layout="wide",
     )
+    inject_pwa_metadata()
     st.markdown(
         """
         <div style="text-align:center; padding: 4rem 1rem;">
@@ -421,9 +582,10 @@ except Exception as exc:
 
 st.set_page_config(
     page_title="The Christian Project",
-    page_icon="✝️",
+    page_icon=_page_icon(),
     layout="wide",
 )
+inject_pwa_metadata()
 
 st.markdown("""
 <style>
@@ -637,8 +799,21 @@ body.sidebar-open .app-shell.mobile-view .sidebar-panel {
 }
 
 .sidebar-brand-icon {
-    font-size: 1.6rem;
-    filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.12));
+    width: 2.75rem;
+    height: 2.75rem;
+    border-radius: 14px;
+    display: grid;
+    place-items: center;
+    background: var(--surface-floating);
+    box-shadow: var(--shadow-soft);
+    border: 1px solid var(--divider);
+    overflow: hidden;
+}
+
+.sidebar-brand-icon img {
+    width: 2.05rem;
+    height: 2.05rem;
+    object-fit: contain;
 }
 
 .sidebar-brand-kicker {
@@ -1289,10 +1464,41 @@ section[data-testid="stSidebar"] button[data-testid="baseButton-secondary"] {
 .chat-header {
     display: flex;
     flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 0.6rem;
+    gap: 0.75rem;
     margin-bottom: 1.4rem;
+    align-items: center;
+    text-align: center;
+}
+
+.chat-header-identity {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.chat-header-logo {
+    width: 3rem;
+    height: 3rem;
+    border-radius: 16px;
+    display: grid;
+    place-items: center;
+    background: var(--surface-floating);
+    box-shadow: var(--shadow-soft);
+    border: 1px solid var(--divider);
+    overflow: hidden;
+}
+
+.chat-header-logo img {
+    width: 2.4rem;
+    height: 2.4rem;
+    object-fit: contain;
+}
+
+.chat-title-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    align-items: center;
     text-align: center;
 }
 
@@ -1304,7 +1510,7 @@ section[data-testid="stSidebar"] button[data-testid="baseButton-secondary"] {
 }
 
 .chat-title-group p {
-    margin: 0.15rem 0 0;
+    margin: 0;
     color: var(--text-secondary);
     font-size: 0.95rem;
     font-family: var(--font-ui);
@@ -1434,8 +1640,16 @@ body[data-theme="dark"] .stChatMessage[data-testid="stChatMessage-User"] > div {
         padding: 1.35rem 1.2rem 2rem;
     }
     .chat-header {
+        align-items: center;
+        text-align: center;
+    }
+    .chat-header-identity {
         flex-direction: column;
-        gap: 0.65rem;
+        gap: 0.6rem;
+    }
+    .chat-title-group {
+        align-items: center;
+        text-align: center;
     }
     .stChatInput {
         position: fixed;
@@ -1505,10 +1719,17 @@ def render_about_modal() -> None:
 
 def render_sidebar() -> None:
     with st.sidebar:
+        logo_src = _resolve_logo_src("primary")
+        logo_srcset_candidate = _resolve_logo_src("large")
+        logo_srcset = ""
+        if logo_srcset_candidate and logo_srcset_candidate != logo_src:
+            logo_srcset = f' srcset="{logo_src} 1x, {logo_srcset_candidate} 2x"'
         st.markdown(
-            """
+            f"""
             <div class="sidebar-brand">
-                <span class="sidebar-brand-icon" aria-hidden="true">✝️</span>
+                <div class="sidebar-brand-icon" role="presentation">
+                    <img src="{logo_src}"{logo_srcset} alt="The Christian Project logo" width="36" height="36" loading="lazy" decoding="async" />
+                </div>
                 <div class="sidebar-brand-text">
                     <span class="sidebar-brand-kicker">The</span>
                     <span class="sidebar-brand-name">Christian Project</span>
@@ -1553,12 +1774,22 @@ def render_trust_panel() -> None:
 
 
 def render_main_header() -> None:
+    logo_src = _resolve_logo_src("primary")
+    logo_srcset_candidate = _resolve_logo_src("large")
+    logo_srcset = ""
+    if logo_srcset_candidate and logo_srcset_candidate != logo_src:
+        logo_srcset = f' srcset="{logo_src} 1x, {logo_srcset_candidate} 2x"'
     st.markdown(
-        """
+        f"""
         <div class="chat-header">
-            <div class="chat-title-group">
-                <h1>The Christian Project</h1>
-                <p>Faithful answers for curious hearts.</p>
+            <div class="chat-header-identity">
+                <div class="chat-header-logo" role="presentation">
+                    <img src="{logo_src}"{logo_srcset} alt="The Christian Project logo" width="48" height="48" decoding="async" />
+                </div>
+                <div class="chat-title-group">
+                    <h1>The Christian Project</h1>
+                    <p>Faithful answers for curious hearts.</p>
+                </div>
             </div>
         </div>
         """,

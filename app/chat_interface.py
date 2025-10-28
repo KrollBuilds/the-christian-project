@@ -70,9 +70,20 @@ load_dotenv()
 
 PUBLIC_ASSETS_DIR = Path(PROJECT_ROOT) / "public"
 ICONS_DIR = PUBLIC_ASSETS_DIR / "icons"
-LOGO_32_PATH = ICONS_DIR / "logo-32.png"
-LOGO_192_PATH = ICONS_DIR / "logo-192.png"
-LOGO_512_PATH = ICONS_DIR / "logo-512.png"
+STATIC_ICONS_DIR = Path(PROJECT_ROOT) / ".streamlit" / "static" / "icons"
+
+
+def _find_icon_path(filename: str) -> Path:
+    for directory in (STATIC_ICONS_DIR, ICONS_DIR):
+        candidate = directory / filename
+        if candidate.exists():
+            return candidate
+    return ICONS_DIR / filename
+
+
+LOGO_32_PATH = _find_icon_path("logo-32.png")
+LOGO_192_PATH = _find_icon_path("logo-192.png")
+LOGO_512_PATH = _find_icon_path("logo-512.png")
 SERVICE_WORKER_PATH = PUBLIC_ASSETS_DIR / "service-worker.js"
 
 
@@ -109,9 +120,9 @@ SERVICE_WORKER_INLINE = (
 )
 
 PWA_ICON_PATHS = {
-    "favicon": "/icons/logo-32.png",
-    "icon_192": "/icons/logo-192.png",
-    "icon_512": "/icons/logo-512.png",
+    "favicon": "/static/icons/logo-32.png",
+    "icon_192": "/static/icons/logo-192.png",
+    "icon_512": "/static/icons/logo-512.png",
     "manifest": "/manifest.json",
     "service_worker": "/service-worker.js",
 }

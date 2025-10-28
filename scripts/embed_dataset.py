@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 from collections import Counter
+import os
 from pathlib import Path
 from typing import Dict, Iterable, List, Tuple
 
@@ -24,7 +25,19 @@ from sentence_transformers import SentenceTransformer
 SOURCE_DATASETS: List[Tuple[str, Path]] = [
     ("doctrine", Path("data/processed/wels_doctrine.jsonl")),
     ("pastoral_teaching", Path("data/processed/pastoral_teachings.jsonl")),
+    ("devotion", Path("data/cleaned/devotions_family_cleaned.jsonl")),
 ]
+# Configure local cache paths (works offline if models already downloaded).
+CACHE_ROOT = Path("data/cache")
+os.environ.setdefault("HF_HOME", str(CACHE_ROOT.resolve()))
+os.environ.setdefault("HUGGINGFACE_HUB_CACHE", str((CACHE_ROOT / "hub").resolve()))
+os.environ.setdefault(
+    "SENTENCE_TRANSFORMERS_HOME", str((CACHE_ROOT / "sentence-transformers").resolve())
+)
+os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
+os.environ.setdefault("HF_HUB_OFFLINE", "1")
+(CACHE_ROOT / "hub").mkdir(parents=True, exist_ok=True)
+(CACHE_ROOT / "sentence-transformers").mkdir(parents=True, exist_ok=True)
 OUTPUT_DIR = Path("data/processed/wels_embeddings")
 INDEX_PATH = OUTPUT_DIR / "wels_faiss.index"
 METADATA_PATH = OUTPUT_DIR / "wels_metadata.json"
@@ -54,7 +67,15 @@ def load_records(paths: List[Tuple[str, Path]]) -> List[Dict[str, str]]:
                 except json.JSONDecodeError:
                     continue
                 if not rec.get("content"):
+                    text = rec.get("text_for_embedding") or rec.get("body")
+                    if text:
+                        rec["content"] = text
+                if not rec.get("content"):
                     continue
+                if not rec.get("title"):
+                    rec["title"] = rec.get("filename") or rec.get("id") or "Untitled"
+                if not rec.get("id"):
+                    rec["id"] = rec.get("filename") or rec.get("title")
                 rec["_dataset"] = dataset_name
                 records.append(rec)
                 counts[dataset_name] += 1
@@ -86,7 +107,19 @@ def chunk_text(text: str, words_per_chunk: int, overlap: int) -> Iterable[str]:
 def main() -> None:
     records = load_records(SOURCE_DATASETS)
 
-    model = SentenceTransformer(MODEL_NAME)
+    local_snapshots_root = CACHE_ROOT / "hub" / "models--sentence-transformers--all-MiniLM-L6-v2" / "snapshots"
+    model_path: str
+    if local_snapshots_root.exists():
+        snapshots = sorted(
+            (p for p in local_snapshots_root.iterdir() if p.is_dir()),
+            key=lambda p: p.stat().st_mtime,
+            reverse=True,
+        )
+        model_path = str(snapshots[0]) if snapshots else MODEL_NAME
+    else:
+        model_path = MODEL_NAME
+
+    model = SentenceTransformer(model_path)
     dim = model.get_sentence_embedding_dimension()
     index = faiss.IndexFlatIP(dim)
 
@@ -109,12 +142,15 @@ def main() -> None:
             "event_date": record.get("event_date") or record.get("date"),
             "topic": record.get("topic") or record.get("series"),
             "tags": record.get("tags", []),
+            "scripture": record.get("scripture"),
+            "category": record.get("category"),
+            "source_document": record.get("filename"),
         }
 
         content = record.get("content", "")
         chunk_size = (
             WORDS_PER_CHUNK_PASTORAL
-            if dataset == "pastoral_teaching"
+            if dataset in {"pastoral_teaching", "devotion"}
             else WORDS_PER_CHUNK_DEFAULT
         )
         chunks = list(chunk_text(content, chunk_size, WORD_OVERLAP))
@@ -130,6 +166,10 @@ def main() -> None:
                 header_parts.append(f"Topic: {base_meta['topic']}")
             if base_meta.get("source"):
                 header_parts.append(f"Source: {base_meta['source']}")
+            if base_meta.get("scripture"):
+                header_parts.append(f"Scripture: {base_meta['scripture']}")
+            if base_meta.get("category"):
+                header_parts.append(f"Category: {base_meta['category']}")
             header_parts.append(f"Content: {chunk}")
             texts.append("\n".join(part for part in header_parts if part))
 

@@ -10,3 +10,8 @@ beautifulsoup4
 requests
 fastapi
 uvicorn
+spacy
+pydantic
+pydantic-settings
+flask
+pytest

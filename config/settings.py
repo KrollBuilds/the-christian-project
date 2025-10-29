@@ -11,6 +11,8 @@ class Settings(BaseSettings):
 
     openai_api_key: str
     rate_limit_per_min: int = 10
+    max_tokens: int = 400
+    temperature: float = 0.3
 
 
 @lru_cache(maxsize=1)
@@ -20,3 +22,7 @@ def get_settings() -> Settings:
 
 
 settings = get_settings()
+
+# Legacy module-level exports retained for backward compatibility.
+MAX_TOKENS = settings.max_tokens
+TEMPERATURE = settings.temperature

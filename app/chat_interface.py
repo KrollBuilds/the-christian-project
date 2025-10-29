@@ -1924,17 +1924,27 @@ def _fallback_from_retrieval(
         message = "Faithful resources are still being gathered for this topic. Please check back soon."
         return append_pastoral_guidance(message)
 
+    def _display_label(entry: Dict[str, Any], *, default: str = "Doctrinal reference") -> str:
+        for key in ("question", "title", "heading", "topic"):
+            value = entry.get(key)
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+        fallback = entry.get("id") or entry.get("chunk_id")
+        if isinstance(fallback, str) and fallback.strip():
+            return fallback.strip()
+        return default
+
     lines: List[str] = ["Here are some related teachings:"]
     for item in doctrine_sources:
         lines.append(
-            f"- **{item.get('question', 'N/A')}** (score {item.get('score', 0):.2f})"
+            f"- **{_display_label(item)}** (score {item.get('score', 0):.2f})"
         )
     if contextual_sources:
         lines.append("")
         lines.append("Related WELS resources:")
         for item in contextual_sources:
             lines.append(
-                f"- **{item.get('title', 'N/A')}** (score {item.get('score', 0):.2f})"
+                f"- **{_display_label(item, default='Contextual resource')}** (score {item.get('score', 0):.2f})"
             )
     compiled = "\n".join(lines).strip()
     return append_pastoral_guidance(compiled)

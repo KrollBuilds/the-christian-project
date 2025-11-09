@@ -1,18 +1,29 @@
-streamlit
+# Core dependencies - install first
+numpy==1.26.4
+Cython
+
+# NLP and ML - Use spacy 3.7.x for numpy 1.26.4 compatibility
+spacy==3.7.6
+https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.7.1/en_core_web_sm-3.7.1-py3-none-any.whl
 sentence-transformers
 faiss-cpu
-numpy
+
+# Web frameworks
+streamlit
+fastapi
+uvicorn[standard]
+
+# Data processing
 pandas
-openai
-python-dotenv
 PyYAML
 beautifulsoup4
 requests
-fastapi
-uvicorn
-spacy
+
+# OpenAI and config
+openai
+python-dotenv
 pydantic
 pydantic-settings
-flask
+
+# Testing
 pytest
-spacy-models==3.8.0

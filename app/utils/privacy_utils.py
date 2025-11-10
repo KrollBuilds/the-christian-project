@@ -99,3 +99,22 @@ def redact_pii(text: str) -> Tuple[str, List[Tuple[str, str]]]:
         all_spans.append(span)
 
     return _merge_spans(text, all_spans)
+
+
+def sanitize_text(text: str) -> str:
+    """
+    Sanitize text by removing PII, returning only the cleaned text.
+
+    This is a convenience wrapper around redact_pii that returns just the
+    sanitized text without the detected entities list.
+
+    Args:
+        text: Input text that may contain PII.
+
+    Returns:
+        The text with PII replaced by labeled tokens like [EMAIL], [PERSON], etc.
+    """
+    if not isinstance(text, str):
+        return ""
+    sanitized, _ = redact_pii(text)
+    return sanitized.strip()

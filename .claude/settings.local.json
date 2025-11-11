@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cat:*)",
+      "Bash(python3:*)",
+      "Read(//Users/jonahkroll/Agents/**)",
+      "WebSearch",
+      "Bash(source mlenv/bin/activate)",
+      "Bash(python:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

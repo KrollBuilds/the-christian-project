@@ -7,6 +7,22 @@ from pathlib import Path
 from datetime import datetime
 import pandas as pd
 from typing import List, Dict, Any
+import sys
+
+# Add utils to path
+sys.path.append(str(Path(__file__).parent.parent))
+from utils.training_data import save_approved_question
+
+# Predefined topic categories (used in filters and re-tagging)
+PREDEFINED_TOPICS = [
+    "General",
+    "Holy Communion",
+    "Devotion",
+    "Bible Studies",
+    "Family",
+    "Prayer",
+    "Trinity"
+]
 
 # Set page configuration
 st.set_page_config(
@@ -69,7 +85,7 @@ with col1:
     st.markdown("Review and manage questions submitted through The Christian Project")
 with col2:
     st.write("")  # Spacing
-    if st.button("🚪 Logout", use_container_width=True):
+    if st.button("Logout", use_container_width=True):
         st.session_state.pastor_authenticated = False
         st.rerun()
 
@@ -154,8 +170,19 @@ st.header("🔍 Filters & Search")
 col1, col2, col3 = st.columns(3)
 
 with col1:
-    # Topic filter
-    all_topics = sorted(set(q.get("topic_cluster", "general") for q in questions))
+    # Topic filter - use predefined topics plus any from dataset
+    dataset_topics = set(q.get("topic_cluster", "general") for q in questions)
+
+    # Combine predefined with dataset topics
+    all_topics = PREDEFINED_TOPICS.copy()
+    for dt in dataset_topics:
+        # Add dataset topic if not already in list (case-insensitive check)
+        if dt and not any(dt.lower() == pt.lower() for pt in PREDEFINED_TOPICS):
+            all_topics.append(dt)
+
+    # Sort alphabetically
+    all_topics.sort()
+
     topic_filter = st.selectbox(
         "Filter by topic:",
         ["All Topics"] + all_topics,
@@ -217,77 +244,166 @@ st.divider()
 
 st.header("💬 Questions")
 
-# Display each question in an expander
-for i, q in enumerate(filtered_questions):
-    question_text = q.get("question", "N/A")
-    answer_text = q.get("answer", "N/A")
-    topic = q.get("topic_cluster", "general")
-    timestamp = q.get("timestamp", "N/A")
-    tone_score = q.get("tone_score", 0.5)
-    response_id = q.get("response_id", "N/A")
+# Check if there are questions to display
+if not filtered_questions:
+    st.info("📭 No questions found matching your filters. Try adjusting the topic filter or search criteria.")
+else:
+    # Display each question in an expander
+    for i, q in enumerate(filtered_questions):
+        question_text = q.get("question", "N/A")
+        answer_text = q.get("answer", "N/A")
+        topic = q.get("topic_cluster", "general")
+        timestamp = q.get("timestamp", "N/A")
+        tone_score = q.get("tone_score", 0.5)
+        response_id = q.get("response_id", "N/A")
 
-    # Format timestamp
-    try:
-        dt = datetime.fromisoformat(timestamp.replace("+00:00", "").replace("Z", ""))
-        timestamp_display = dt.strftime("%Y-%m-%d %H:%M")
-    except:
-        timestamp_display = timestamp
+        # Format timestamp
+        try:
+            dt = datetime.fromisoformat(timestamp.replace("+00:00", "").replace("Z", ""))
+            timestamp_display = dt.strftime("%Y-%m-%d %H:%M")
+        except:
+            timestamp_display = timestamp
 
-    # Color code tone score
-    if tone_score >= 0.7:
-        tone_color = "🟢"
-    elif tone_score >= 0.4:
-        tone_color = "🟡"
-    else:
-        tone_color = "🔴"
+        # Color code tone score
+        if tone_score >= 0.7:
+            tone_color = "🟢"
+        elif tone_score >= 0.4:
+            tone_color = "🟡"
+        else:
+            tone_color = "🔴"
 
-    # Expander title with preview
-    preview = question_text[:80] + "..." if len(question_text) > 80 else question_text
-    expander_title = f"**Q{i+1}:** {preview} | {tone_color} {tone_score:.2f} | {timestamp_display}"
+        # Expander title with preview
+        preview = question_text[:80] + "..." if len(question_text) > 80 else question_text
+        expander_title = f"**Q{i+1}:** {preview} | {tone_color} {tone_score:.2f} | {timestamp_display}"
 
-    with st.expander(expander_title):
-        # Question details
-        st.markdown("### Question")
-        st.write(question_text)
+        with st.expander(expander_title):
+            # Question details
+            st.markdown("### Question")
+            st.write(question_text)
 
-        st.markdown("### Answer")
-        st.write(answer_text)
+            st.markdown("### Answer")
+            st.write(answer_text)
 
-        # Metadata
-        col1, col2, col3, col4 = st.columns(4)
-        with col1:
-            st.caption(f"**Topic:** {topic}")
-        with col2:
-            st.caption(f"**Tone:** {tone_score:.2f}")
-        with col3:
-            st.caption(f"**Time:** {timestamp_display}")
-        with col4:
-            st.caption(f"**ID:** {response_id[:12]}...")
+            # Metadata
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                st.caption(f"**Topic:** {topic}")
+            with col2:
+                st.caption(f"**Tone:** {tone_score:.2f}")
+            with col3:
+                st.caption(f"**Time:** {timestamp_display}")
+            with col4:
+                st.caption(f"**ID:** {response_id[:12]}...")
 
-        st.divider()
+            st.divider()
 
-        # Action buttons (placeholder for future features)
-        col1, col2, col3, col4 = st.columns(4)
+            # ==================================================================
+            # FEATURE 1: RESPONSE EDITOR
+            # ==================================================================
 
-        with col1:
-            if st.button(f"✅ Approve", key=f"approve_{i}", use_container_width=True):
-                st.success("Approved for training dataset!")
-                # TODO: Future - write to approved_questions.jsonl
+            st.markdown("### ✏️ Review & Edit Response")
+            st.caption("Edit the response if needed before approving for training")
 
-        with col2:
-            if st.button(f"❌ Reject", key=f"reject_{i}", use_container_width=True):
-                st.warning("Rejected - will not use for training")
-                # TODO: Future - write to rejected_questions.jsonl
+            # Editable text area for the response
+            edited_response = st.text_area(
+                "Response (editable):",
+                value=answer_text,
+                height=200,
+                key=f"edit_response_{response_id}",
+                help="Edit this response to improve it before adding to training data"
+            )
 
-        with col3:
-            if st.button(f"🏷️ Re-tag", key=f"retag_{i}", use_container_width=True):
-                st.info("Re-tagging feature coming soon!")
-                # TODO: Future - allow topic reclassification
+            # Show indicator if response was edited
+            if edited_response.strip() != answer_text.strip():
+                st.info("✏️ Response has been modified")
 
-        with col4:
-            if st.button(f"📝 Add Note", key=f"note_{i}", use_container_width=True):
-                st.info("Notes feature coming soon!")
-                # TODO: Future - add pastor notes
+                # Show diff preview (optional but nice)
+                with st.expander("👁️ View Changes"):
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.markdown("**Original:**")
+                        st.text(answer_text[:300] + "..." if len(answer_text) > 300 else answer_text)
+                    with col2:
+                        st.markdown("**Edited:**")
+                        st.text(edited_response[:300] + "..." if len(edited_response) > 300 else edited_response)
+
+            st.divider()
+
+            # ==================================================================
+            # FEATURE 2: RE-TAG
+            # ==================================================================
+
+            st.markdown("### 🏷️ Topic Classification")
+
+            # Get any additional topics from the dataset that aren't in predefined list
+            dataset_topics = set(q.get("topic_cluster", "general") for q in questions)
+
+            # Combine predefined topics with any unique topics from dataset
+            all_topics = PREDEFINED_TOPICS.copy()
+            for dt in dataset_topics:
+                # Add dataset topic if not already in list (case-insensitive check)
+                if dt and not any(dt.lower() == pt.lower() for pt in PREDEFINED_TOPICS):
+                    all_topics.append(dt)
+
+            # If current topic not in list, add it
+            if topic and not any(topic.lower() == t.lower() for t in all_topics):
+                all_topics.append(topic)
+
+            # Sort alphabetically
+            all_topics.sort()
+
+            # Topic selector
+            selected_topic = st.selectbox(
+                "Assign topic:",
+                options=all_topics,
+                index=all_topics.index(topic) if topic in all_topics else 0,
+                key=f"topic_select_{response_id}",
+                help="Change the topic classification if needed"
+            )
+
+            # Show indicator if topic was changed
+            if selected_topic != topic:
+                st.info(f"🏷️ Topic changed: '{topic}' → '{selected_topic}'")
+
+            st.divider()
+
+            # ==================================================================
+            # ACTION BUTTONS
+            # ==================================================================
+
+            col1, col2 = st.columns(2)
+
+            with col1:
+                # Approve button - saves edited response and new topic
+                if st.button("✅ Approve for Training", key=f"approve_{i}", use_container_width=True, type="primary"):
+                    try:
+                        # Save the approved question with edited response and topic
+                        save_approved_question(
+                            question=question_text,
+                            response=edited_response,  # Use edited version
+                            topic=selected_topic,      # Use selected topic
+                            response_id=response_id,
+                            editor_notes=f"Reviewed by pastor. Original topic: {topic}" if selected_topic != topic else "Reviewed and approved by pastor"
+                        )
+
+                        st.success("✅ Approved! Added to training dataset.")
+                        st.balloons()
+
+                        # Show what was saved
+                        with st.expander("📋 What was saved"):
+                            st.write("**Question:**", question_text)
+                            st.write("**Response:**", edited_response[:200] + "..." if len(edited_response) > 200 else edited_response)
+                            st.write("**Topic:**", selected_topic)
+                            st.write("**Status:**", "Approved for training")
+
+                    except Exception as e:
+                        st.error(f"Error saving: {e}")
+
+            with col2:
+                # Reject button - for future use
+                if st.button("❌ Reject", key=f"reject_{i}", use_container_width=True):
+                    st.warning("⚠️ Rejected - will not use for training")
+                    st.info("(Future: This will move to rejected items)")
 
 st.divider()
 
@@ -339,53 +455,62 @@ st.divider()
 
 st.header("📊 Analytics")
 
-# Topic distribution
-st.subheader("Topic Distribution")
-topic_counts = {}
-for q in filtered_questions:
-    topic = q.get("topic_cluster", "general")
-    topic_counts[topic] = topic_counts.get(topic, 0) + 1
-
-topic_df = pd.DataFrame([
-    {"Topic": k, "Count": v}
-    for k, v in sorted(topic_counts.items(), key=lambda x: x[1], reverse=True)
-])
-
-st.bar_chart(topic_df.set_index("Topic"))
-
-# Tone score distribution
-st.subheader("Tone Score Distribution")
-tone_scores = [q.get("tone_score", 0.5) for q in filtered_questions]
-tone_df = pd.DataFrame({"Tone Score": tone_scores})
-
-st.line_chart(tone_df)
-
-# Questions over time
-st.subheader("Questions Over Time")
-try:
-    timestamps = []
+# Check if there are any filtered questions to show analytics for
+if not filtered_questions:
+    st.info("📭 No questions match the selected filters. Try selecting 'All Topics' or adjusting your search criteria.")
+else:
+    # Topic distribution
+    st.subheader("Topic Distribution")
+    topic_counts = {}
     for q in filtered_questions:
-        try:
-            ts = q.get("timestamp", "")
-            if ts:
-                dt = datetime.fromisoformat(ts.replace("+00:00", "").replace("Z", ""))
-                timestamps.append(dt)
-        except:
-            pass
+        topic = q.get("topic_cluster", "general")
+        topic_counts[topic] = topic_counts.get(topic, 0) + 1
 
-    if timestamps:
-        # Group by date
-        from collections import Counter
-        date_counts = Counter([dt.date() for dt in timestamps])
-        date_df = pd.DataFrame([
-            {"Date": str(k), "Questions": v}
-            for k, v in sorted(date_counts.items())
+    if topic_counts:
+        topic_df = pd.DataFrame([
+            {"Topic": k, "Count": v}
+            for k, v in sorted(topic_counts.items(), key=lambda x: x[1], reverse=True)
         ])
-        st.line_chart(date_df.set_index("Date"))
+        st.bar_chart(topic_df.set_index("Topic"))
     else:
-        st.info("Not enough timestamp data to show timeline")
-except Exception as e:
-    st.warning(f"Could not generate timeline: {e}")
+        st.info("No topic data available")
+
+    # Tone score distribution
+    st.subheader("Tone Score Distribution")
+    tone_scores = [q.get("tone_score", 0.5) for q in filtered_questions]
+
+    if tone_scores:
+        tone_df = pd.DataFrame({"Tone Score": tone_scores})
+        st.line_chart(tone_df)
+    else:
+        st.info("No tone score data available")
+
+    # Questions over time
+    st.subheader("Questions Over Time")
+    try:
+        timestamps = []
+        for q in filtered_questions:
+            try:
+                ts = q.get("timestamp", "")
+                if ts:
+                    dt = datetime.fromisoformat(ts.replace("+00:00", "").replace("Z", ""))
+                    timestamps.append(dt)
+            except:
+                pass
+
+        if timestamps:
+            # Group by date
+            from collections import Counter
+            date_counts = Counter([dt.date() for dt in timestamps])
+            date_df = pd.DataFrame([
+                {"Date": str(k), "Questions": v}
+                for k, v in sorted(date_counts.items())
+            ])
+            st.line_chart(date_df.set_index("Date"))
+        else:
+            st.info("Not enough timestamp data to show timeline")
+    except Exception as e:
+        st.warning(f"Could not generate timeline: {e}")
 
 # ============================================================================
 # FOOTER

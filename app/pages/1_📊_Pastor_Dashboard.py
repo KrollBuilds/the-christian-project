@@ -40,7 +40,7 @@ def check_authentication():
     col1, col2 = st.columns([1, 4])
     with col1:
         if st.button("Login", type="primary", use_container_width=True):
-            correct_password = os.getenv("PASTOR_PASSWORD", "changeme123")
+            correct_password = os.getenv("PASTOR_PASSWORD", "faith2025!")
 
             if password == correct_password:
                 st.session_state.pastor_authenticated = True

@@ -420,19 +420,50 @@ def push_for_pastoral_review(question: str, assistant_payload: Dict[str, Any]) -
 
 
 def synthesize_with_gpt(question: str, context: str) -> Optional[str]:
+    """
+    Synthesize a response using GPT-4o-mini with improved prompting.
+
+    Uses gpt-4o-mini for better accuracy and 66% cost savings vs gpt-3.5-turbo.
+    Temperature: 0.3 for more consistent responses
+    Max tokens: 800 for complete answers
+    """
+    # Improved system prompt
+    system_prompt = """You are a theological assistant trained in WELS Lutheran doctrine and Scripture.
+
+Your role:
+- Provide clear, accurate answers grounded in biblical teaching
+- Stay faithful to Scripture and WELS Lutheran theology
+- Reference specific sources when making theological claims
+- Use natural, conversational language
+
+IMPORTANT: When using information from the provided sources, cite them naturally
+(e.g., "According to WELS teaching..." or "As Scripture teaches...").
+"""
+
+    # Format the user prompt with better structure
+    user_prompt = f"""Based on the following sources from Scripture and Lutheran theology, answer this question:
+
+Question: {question}
+
+Available Sources:
+{context}
+
+Instructions:
+1. Answer clearly and directly
+2. Reference the sources in your response when relevant
+3. Stay faithful to what Scripture and the sources actually teach
+4. Use natural, pastoral language
+
+Provide a thoughtful, scripturally-grounded response:"""
+
     try:
         completion = client.chat.completions.create(
-            model=os.getenv("OPENAI_COMPLETIONS_MODEL", "gpt-3.5-turbo"),
-            temperature=0.4,
+            model=os.getenv("OPENAI_COMPLETIONS_MODEL", "gpt-4o-mini"),
+            temperature=0.3,  # More consistent than 0.4
+            max_tokens=800,   # More complete responses than default
             messages=[
-                {
-                    "role": "system",
-                    "content": "You are a faithful WELS-aligned theological assistant."
-                },
-                {
-                    "role": "user",
-                    "content": f"Question: {question}\n\nContext:\n{context}",
-                },
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
             ],
         )
     except Exception as exc:
@@ -1827,32 +1858,104 @@ def display_chat_history() -> None:
             tone_score = sources.get("tone_score")
 
             if doctrine_sources or contextual_sources:
-                with st.expander("Context used", expanded=False):
+                total_sources = len(doctrine_sources) + len(contextual_sources)
+                with st.expander(f"📚 View {total_sources} source(s)", expanded=False):
+                    source_num = 1
+
                     if doctrine_sources:
-                        st.markdown("**Doctrinal sources**")
+                        st.markdown("### Doctrinal Sources")
                         for item in doctrine_sources:
-                            preview = format_truncated_answer(
-                                item.get("answer", ""), 300
-                            )
-                            st.markdown(
-                                f"• **Q:** {item.get('question', 'N/A')}  \n"
-                                f"  Score: {item.get('score', 0.0):.4f}  \n"
-                                f"  Preview: {preview}"
-                            )
+                            score = item.get('score', 0.0)
+                            relevance = "🟢 High" if score > 0.85 else "🟡 Medium" if score > 0.70 else "🟠 Moderate"
+
+                            # Extract title and content from available fields
+                            doc_title = item.get('title') or 'WELS Doctrine'
+                            source_type = item.get('type', 'unknown')
+                            category = item.get('category')
+                            source_name = item.get('source')
+
+                            # Build a better display title
+                            display_title = doc_title
+                            if category:
+                                display_title = f"{category} - {doc_title}" if len(doc_title) < 50 else category
+                            elif source_name:
+                                display_title = f"{source_name} - {doc_title}" if len(doc_title) < 50 else source_name
+
+                            st.markdown(f"**Source {source_num}: {display_title}**")
+
+                            # Extract content from appropriate field based on data structure
+                            # Priority: scripture (for devotions), title (for doctrines), answer (for Q&A), content
+                            content_text = None
+                            if item.get('scripture'):
+                                content_text = item['scripture']
+                                if source_type == 'devotion':
+                                    st.caption(f"Type: Devotion")
+                            elif item.get('question'):
+                                # Q&A format
+                                st.caption(f"Question: {item['question'][:100]}...")
+                                content_text = item.get('answer', '')
+                            elif item.get('title') and source_type == 'doctrine':
+                                # For doctrine entries, the title IS the doctrinal statement
+                                content_text = item['title']
+                            elif item.get('content'):
+                                content_text = item['content']
+
+                            if content_text:
+                                preview = content_text[:300] + "..." if len(content_text) > 300 else content_text
+                                st.markdown(f"> {preview}")
+                            else:
+                                st.markdown(f"> _Content preview unavailable_")
+
+                            st.caption(f"{relevance} (Score: {score:.2f})")
+                            if source_num < total_sources:
+                                st.markdown("---")
+                            source_num += 1
+
                     if contextual_sources:
-                        st.markdown("**Contextual sources**")
+                        if doctrine_sources:
+                            st.markdown("")
+                        st.markdown("### Contextual Sources")
                         for item in contextual_sources:
-                            preview = format_truncated_answer(
-                                item.get("content", ""), 300
-                            )
-                            url = item.get("url")
-                            link_text = f"[{url}]({url})" if url else "N/A"
-                            st.markdown(
-                                f"• **Title:** {item.get('title', 'N/A')}  \n"
-                                f"  Score: {item.get('score', 0.0):.4f}  \n"
-                                f"  Link: {link_text}  \n"
-                                f"  Preview: {preview}"
-                            )
+                            score = item.get('score', 0.0)
+                            relevance = "🟢 High" if score > 0.85 else "🟡 Medium" if score > 0.70 else "🟠 Moderate"
+
+                            doc_title = item.get('title', 'WELS Resource')
+                            category = item.get('category')
+                            source_name = item.get('source')
+
+                            # Build display title
+                            display_title = doc_title
+                            if category:
+                                display_title = f"{category}" if len(doc_title) > 60 else f"{category} - {doc_title}"
+                            elif source_name:
+                                display_title = f"{source_name}" if len(doc_title) > 60 else f"{source_name} - {doc_title}"
+
+                            st.markdown(f"**Source {source_num}: {display_title}**")
+
+                            # Show URL if available
+                            url = item.get('url')
+                            if url:
+                                st.caption(f"Link: [{url}]({url})")
+
+                            # Extract content from appropriate field
+                            content_text = None
+                            if item.get('scripture'):
+                                content_text = item['scripture']
+                            elif item.get('title'):
+                                content_text = item['title']
+                            elif item.get('content'):
+                                content_text = item['content']
+
+                            if content_text:
+                                preview = content_text[:300] + "..." if len(content_text) > 300 else content_text
+                                st.markdown(f"> {preview}")
+                            else:
+                                st.markdown(f"> _Content preview unavailable_")
+
+                            st.caption(f"{relevance} (Score: {score:.2f})")
+                            if source_num < total_sources:
+                                st.markdown("---")
+                            source_num += 1
             if tone_score is not None and st.session_state.get("developer_mode"):
                 st.caption(f"Tonal alignment score: {tone_score}")
             if warnings:
@@ -1962,6 +2065,7 @@ def handle_question(question: str) -> Dict[str, Any]:
     else:
         context_for_llm = "\n\n".join(context_sections)
 
+    # Show spinner with encouraging Bible verse while generating response
     with st.spinner(next(LOADING_VERSES)):
         answer = synthesize_with_gpt(question, context_for_llm)
 
@@ -2062,7 +2166,7 @@ def process_input(user_input_raw: str) -> None:
     )
     st.session_state.chat_history.append(assistant_message)
     push_for_pastoral_review(sanitized_input, assistant_message)
-    st.toast("Response generated")
+    # Toast removed to prevent double-render banner issue during question processing
 
 
 # Review dashboard integration handled via push_for_pastoral_review

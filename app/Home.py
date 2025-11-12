@@ -380,12 +380,21 @@ def push_for_pastoral_review(question: str, assistant_payload: Dict[str, Any]) -
         sources = assistant_payload.get("sources", [])
 
         # Determine topic cluster from sources (if available)
-        topic_cluster = "general"
-        if sources:
-            # Try to extract topic from first source
-            first_source = sources[0] if isinstance(sources, list) else sources
-            if isinstance(first_source, dict):
-                topic_cluster = first_source.get("topic", "general")
+        topic_cluster = "General"  # Default to proper case "General"
+        if sources and isinstance(sources, dict):
+            # Try to extract topic from doctrine or contextual sources
+            doctrine_sources = sources.get("doctrine", [])
+            contextual_sources = sources.get("contextual", [])
+
+            # Try doctrine sources first, then contextual
+            source_list = doctrine_sources if doctrine_sources else contextual_sources
+
+            if source_list and len(source_list) > 0:
+                first_source = source_list[0]
+                if isinstance(first_source, dict):
+                    topic = first_source.get("topic", "General")
+                    # Normalize to proper case
+                    topic_cluster = topic.title() if topic else "General"
 
         # Calculate tone score (if available in payload)
         tone_score = 0.5  # default neutral

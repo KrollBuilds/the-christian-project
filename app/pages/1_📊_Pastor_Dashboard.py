@@ -11,7 +11,7 @@ import sys
 
 # Add utils to path
 sys.path.append(str(Path(__file__).parent.parent))
-from utils.training_data import save_approved_question
+from utils.training_data import save_approved_question, update_review_queue_topic
 
 # Predefined topic categories (used in filters and re-tagging)
 PREDEFINED_TOPICS = [
@@ -128,7 +128,8 @@ st.header("📈 Overview")
 
 # Calculate metrics
 total_questions = len(questions)
-unique_topics = len(set(q.get("topic_cluster", "general") for q in questions))
+# Normalize topics to proper case for counting
+unique_topics = len(set(q.get("topic_cluster", "General").title() for q in questions))
 avg_tone = sum(q.get("tone_score", 0.5) for q in questions) / total_questions if total_questions > 0 else 0
 
 # Recent questions (last 7 days)
@@ -171,7 +172,8 @@ col1, col2, col3 = st.columns(3)
 
 with col1:
     # Topic filter - use predefined topics plus any from dataset
-    dataset_topics = set(q.get("topic_cluster", "general") for q in questions)
+    # Normalize all topics to proper case
+    dataset_topics = set(q.get("topic_cluster", "General").title() for q in questions)
 
     # Combine predefined with dataset topics
     all_topics = PREDEFINED_TOPICS.copy()
@@ -208,11 +210,11 @@ with col3:
 # Apply filters
 filtered_questions = questions
 
-# Topic filter
+# Topic filter (case-insensitive)
 if topic_filter != "All Topics":
     filtered_questions = [
         q for q in filtered_questions
-        if q.get("topic_cluster", "general") == topic_filter
+        if q.get("topic_cluster", "General").lower() == topic_filter.lower()
     ]
 
 # Search filter
@@ -252,7 +254,8 @@ else:
     for i, q in enumerate(filtered_questions):
         question_text = q.get("question", "N/A")
         answer_text = q.get("answer", "N/A")
-        topic = q.get("topic_cluster", "general")
+        # Normalize topic to proper case
+        topic = q.get("topic_cluster", "General").title()
         timestamp = q.get("timestamp", "N/A")
         tone_score = q.get("tone_score", 0.5)
         response_id = q.get("response_id", "N/A")
@@ -336,7 +339,8 @@ else:
             st.markdown("### 🏷️ Topic Classification")
 
             # Get any additional topics from the dataset that aren't in predefined list
-            dataset_topics = set(q.get("topic_cluster", "general") for q in questions)
+            # Normalize all topics to proper case
+            dataset_topics = set(q.get("topic_cluster", "General").title() for q in questions)
 
             # Combine predefined topics with any unique topics from dataset
             all_topics = PREDEFINED_TOPICS.copy()
@@ -352,11 +356,16 @@ else:
             # Sort alphabetically
             all_topics.sort()
 
-            # Topic selector
+            # Topic selector - find index case-insensitively
+            try:
+                topic_index = next(i for i, t in enumerate(all_topics) if t.lower() == topic.lower())
+            except StopIteration:
+                topic_index = 0
+
             selected_topic = st.selectbox(
                 "Assign topic:",
                 options=all_topics,
-                index=all_topics.index(topic) if topic in all_topics else 0,
+                index=topic_index,
                 key=f"topic_select_{response_id}",
                 help="Change the topic classification if needed"
             )
@@ -377,6 +386,12 @@ else:
                 # Approve button - saves edited response and new topic
                 if st.button("✅ Approve for Training", key=f"approve_{i}", use_container_width=True, type="primary"):
                     try:
+                        # If topic was changed, update it in review queue first
+                        if selected_topic != topic:
+                            update_success = update_review_queue_topic(response_id, selected_topic)
+                            if not update_success:
+                                st.warning("⚠️ Topic update in review queue failed, but continuing with approval...")
+
                         # Save the approved question with edited response and topic
                         save_approved_question(
                             question=question_text,

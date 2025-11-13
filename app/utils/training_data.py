@@ -11,7 +11,7 @@ APPROVED_FILE = PROJECT_ROOT / "data" / "metrics" / "approved_training.jsonl"
 REVIEW_QUEUE_FILE = PROJECT_ROOT / "data" / "metrics" / "review_queue.jsonl"
 
 def save_approved_question(question: str, response: str, topic: str,
-                           response_id: str, editor_notes: str = "") -> None:
+                           response_id: str, editor_notes: str = "") -> Dict[str, Any]:
     """
     Save an approved Q&A pair to training dataset.
 
@@ -21,26 +21,94 @@ def save_approved_question(question: str, response: str, topic: str,
         topic: Topic classification
         response_id: Unique identifier
         editor_notes: Optional notes from pastor
+
+    Returns:
+        Dict with 'success' (bool), 'message' (str), and 'file_path' (str)
     """
+    try:
+        # Ensure directory exists
+        APPROVED_FILE.parent.mkdir(parents=True, exist_ok=True)
 
-    # Ensure directory exists
-    APPROVED_FILE.parent.mkdir(parents=True, exist_ok=True)
+        approved_entry = {
+            "question": question,
+            "response": response,
+            "topic": topic,
+            "response_id": response_id,
+            "approved_at": datetime.utcnow().isoformat(),
+            "editor_notes": editor_notes,
+            "status": "approved"
+        }
 
-    approved_entry = {
-        "question": question,
-        "response": response,
-        "topic": topic,
-        "response_id": response_id,
-        "approved_at": datetime.utcnow().isoformat(),
-        "editor_notes": editor_notes,
-        "status": "approved"
-    }
+        # Append to approved training file
+        with APPROVED_FILE.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(approved_entry, ensure_ascii=False) + "\n")
 
-    # Append to approved training file
-    with APPROVED_FILE.open("a", encoding="utf-8") as f:
-        f.write(json.dumps(approved_entry, ensure_ascii=False) + "\n")
+        # Verify the file was written by checking it exists and has content
+        if not APPROVED_FILE.exists():
+            return {
+                "success": False,
+                "message": f"File was not created: {APPROVED_FILE}",
+                "file_path": str(APPROVED_FILE)
+            }
 
-    print(f"✅ Approved Q&A saved to training: {response_id}")
+        file_size = APPROVED_FILE.stat().st_size
+        print(f"✅ Approved Q&A saved to training: {response_id}")
+        print(f"📁 File location: {APPROVED_FILE}")
+        print(f"📊 File size: {file_size} bytes")
+
+        return {
+            "success": True,
+            "message": f"Successfully saved to {APPROVED_FILE.name}",
+            "file_path": str(APPROVED_FILE),
+            "file_size": file_size,
+            "response_id": response_id
+        }
+
+    except PermissionError as e:
+        error_msg = f"Permission denied writing to {APPROVED_FILE}: {e}"
+        print(f"❌ {error_msg}")
+        return {
+            "success": False,
+            "message": error_msg,
+            "file_path": str(APPROVED_FILE)
+        }
+    except Exception as e:
+        error_msg = f"Error saving approved question: {e}"
+        print(f"❌ {error_msg}")
+        return {
+            "success": False,
+            "message": error_msg,
+            "file_path": str(APPROVED_FILE)
+        }
+
+
+def get_recent_approved_entries(limit: int = 10) -> list[Dict[str, Any]]:
+    """
+    Get the most recent approved training entries.
+
+    Args:
+        limit: Maximum number of entries to return (default 10)
+
+    Returns:
+        List of approved entry dictionaries, most recent first
+    """
+    if not APPROVED_FILE.exists():
+        return []
+
+    try:
+        entries = []
+        with APPROVED_FILE.open("r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line:
+                    entries.append(json.loads(line))
+
+        # Return most recent entries (last N lines)
+        return entries[-limit:] if len(entries) > limit else entries
+
+    except Exception as e:
+        print(f"❌ Error reading approved entries: {e}")
+        return []
 
 
 def update_review_queue_topic(response_id: str, new_topic: str) -> bool:

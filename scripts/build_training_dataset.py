@@ -25,7 +25,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--input_path",
         type=Path,
-        default=Path("data/feedback/review_log.jsonl"),
+        default=Path("data/metrics/approved_training.jsonl"),
         help="Path to the reviewed responses JSONL file.",
     )
     parser.add_argument(
@@ -72,24 +72,22 @@ def filter_reviews(
 ) -> List[dict]:
     approved: List[dict] = []
     for review in reviews:
-        if review.get("accuracy") != "Sound":
-            continue
-        if review.get("tone") != "Pastoral":
-            continue
-        if not review.get("question") or not review.get("answer"):
+        # Approved training file uses 'response' instead of 'answer'
+        if not review.get("question") or not review.get("response"):
             continue
 
-        tone_score = review.get("tone_score")
-        if tone_score is None or not isinstance(tone_score, (float, int)):
-            continue
-        if tone_score < min_tone:
+        # Only include entries with 'approved' status
+        if review.get("status") != "approved":
             continue
 
+        # Check timestamp if specified (uses 'approved_at' field)
         if min_timestamp is not None:
-            timestamp = parse_timestamp(review.get("timestamp", ""))
+            timestamp = parse_timestamp(review.get("approved_at", ""))
             if timestamp is None or timestamp < min_timestamp:
                 continue
 
+        # Note: min_tone parameter ignored for approved_training.jsonl
+        # All entries are already vetted by pastors
         approved.append(review)
     return approved
 
@@ -98,7 +96,8 @@ def build_examples(reviews: Iterable[dict]) -> List[dict]:
     examples: List[dict] = []
     for review in reviews:
         question = review["question"].strip()
-        answer = normalize_answer(review["answer"])
+        # Approved training uses 'response' field instead of 'answer'
+        answer = normalize_answer(review["response"])
         if not answer:
             continue
         examples.append(

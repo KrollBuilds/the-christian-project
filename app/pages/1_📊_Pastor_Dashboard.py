@@ -393,7 +393,7 @@ else:
                                 st.warning("⚠️ Topic update in review queue failed, but continuing with approval...")
 
                         # Save the approved question with edited response and topic
-                        save_approved_question(
+                        result = save_approved_question(
                             question=question_text,
                             response=edited_response,  # Use edited version
                             topic=selected_topic,      # Use selected topic
@@ -401,18 +401,31 @@ else:
                             editor_notes=f"Reviewed by pastor. Original topic: {topic}" if selected_topic != topic else "Reviewed and approved by pastor"
                         )
 
-                        st.success("✅ Approved! Added to training dataset.")
-                        st.balloons()
+                        # Check if save was successful
+                        if result["success"]:
+                            st.success("✅ Approved! Added to training dataset.")
+                            st.balloons()
 
-                        # Show what was saved
-                        with st.expander("📋 What was saved"):
-                            st.write("**Question:**", question_text)
-                            st.write("**Response:**", edited_response[:200] + "..." if len(edited_response) > 200 else edited_response)
-                            st.write("**Topic:**", selected_topic)
-                            st.write("**Status:**", "Approved for training")
+                            # Show what was saved with detailed info
+                            with st.expander("📋 What was saved"):
+                                st.write("**Question:**", question_text)
+                                st.write("**Response:**", edited_response[:200] + "..." if len(edited_response) > 200 else edited_response)
+                                st.write("**Topic:**", selected_topic)
+                                st.write("**Response ID:**", result.get("response_id", response_id))
+                                st.write("**Status:**", "Approved for training")
+                                st.write("**File Location:**", result["file_path"])
+                                st.write("**File Size:**", f"{result.get('file_size', 0)} bytes")
+                                st.info(f"✓ {result['message']}")
+                        else:
+                            st.error(f"❌ Failed to save to training dataset!")
+                            st.error(f"Error: {result['message']}")
+                            st.info(f"File path: {result['file_path']}")
+                            st.warning("⚠️ Please try again or contact support if the issue persists.")
 
                     except Exception as e:
-                        st.error(f"Error saving: {e}")
+                        st.error(f"❌ Unexpected error saving: {e}")
+                        import traceback
+                        st.code(traceback.format_exc())
 
             with col2:
                 # Reject button - for future use

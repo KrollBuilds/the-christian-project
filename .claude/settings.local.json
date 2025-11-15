@@ -6,7 +6,11 @@
       "Read(//Users/jonahkroll/Agents/**)",
       "WebSearch",
       "Bash(source mlenv/bin/activate)",
-      "Bash(python:*)"
+      "Bash(python:*)",
+      "WebFetch(domain:wels.net)",
+      "WebFetch(domain:forwardinchrist.net)",
+      "WebFetch(domain:welsrc.net)",
+      "WebFetch(domain:whataboutjesus.com)"
     ],
     "deny": [],
     "ask": []

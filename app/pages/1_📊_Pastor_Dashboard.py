@@ -42,7 +42,7 @@ def check_authentication():
     if st.session_state.pastor_authenticated:
         return True
 
-    st.title("🔐 Pastor Access Only")
+    st.title("Pastor Access Only")
     st.markdown("This dashboard is restricted to authorized pastoral staff.")
 
     # Password input
@@ -65,9 +65,6 @@ def check_authentication():
             else:
                 st.error("Incorrect password. Please try again.")
 
-    with col2:
-        st.info("👋 First time? Set PASTOR_PASSWORD in Railway environment variables")
-
     return False
 
 # Exit if not authenticated
@@ -81,7 +78,7 @@ if not check_authentication():
 # Header with logout
 col1, col2 = st.columns([4, 1])
 with col1:
-    st.title("📊 Pastor Dashboard - Question Review")
+    st.title("Pastor Dashboard - Question Review")
     st.markdown("Review and manage questions submitted through The Christian Project")
 with col2:
     st.write("")  # Spacing
@@ -116,7 +113,7 @@ questions = load_questions()
 
 # Show warning if no data
 if not questions:
-    st.warning("📭 No questions have been submitted yet.")
+    st.warning("No questions have been submitted yet.")
     st.info("Questions will appear here after users interact with the chat interface.")
     st.stop()
 
@@ -124,7 +121,7 @@ if not questions:
 # DASHBOARD OVERVIEW METRICS
 # ============================================================================
 
-st.header("📈 Overview")
+st.header("Overview")
 
 # Calculate metrics
 total_questions = len(questions)
@@ -166,7 +163,7 @@ st.divider()
 # FILTERS AND SEARCH
 # ============================================================================
 
-st.header("🔍 Filters & Search")
+st.header("Filters & Search")
 
 col1, col2, col3 = st.columns(3)
 
@@ -244,11 +241,11 @@ st.divider()
 # QUESTIONS DISPLAY
 # ============================================================================
 
-st.header("💬 Questions")
+st.header("Questions")
 
 # Check if there are questions to display
 if not filtered_questions:
-    st.info("📭 No questions found matching your filters. Try adjusting the topic filter or search criteria.")
+    st.info("No questions found matching your filters. Try adjusting the topic filter or search criteria.")
 else:
     # Display each question in an expander
     for i, q in enumerate(filtered_questions):
@@ -336,7 +333,7 @@ else:
             # FEATURE 2: RE-TAG
             # ==================================================================
 
-            st.markdown("### 🏷️ Topic Classification")
+            st.markdown("### Topic Classification")
 
             # Get any additional topics from the dataset that aren't in predefined list
             # Normalize all topics to proper case
@@ -372,7 +369,7 @@ else:
 
             # Show indicator if topic was changed
             if selected_topic != topic:
-                st.info(f"🏷️ Topic changed: '{topic}' → '{selected_topic}'")
+                st.info(f"Topic changed: '{topic}' → '{selected_topic}'")
 
             st.divider()
 
@@ -545,5 +542,5 @@ else:
 # ============================================================================
 
 st.divider()
-st.caption("🔒 This dashboard is password-protected and logs are sanitized for privacy.")
+st.caption("This dashboard is password-protected and logs are sanitized for privacy.")
 st.caption("For technical support, contact your system administrator.")

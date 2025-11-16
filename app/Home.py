@@ -556,7 +556,7 @@ body {
     --surface-floating: rgba(255, 255, 255, 0.8);
     --text-primary: #2e2e2e;
     --text-secondary: #4a4a4a;
-    --text-muted: rgba(46, 46, 46, 0.68);
+    --text-muted: rgba(46, 46, 46, 0.85);
     --accent: #4b2e05;
     --accent-contrast: #fffaf0;
     --accent-soft: rgba(75, 46, 5, 0.22);
@@ -572,7 +572,7 @@ body {
     --bubble-user: #e0d3b8;
     --input-bg: #fffdf7;
     --input-border: #cfc3a7;
-    --divider: rgba(75, 46, 5, 0.12);
+    --divider: rgba(75, 46, 5, 0.20);
     --shadow-soft: 0 10px 26px rgba(75, 46, 5, 0.1);
     --shadow-header: 0 2px 12px rgba(0, 0, 0, 0.08);
     --shadow-hover: 0 12px 24px rgba(75, 46, 5, 0.16);
@@ -590,7 +590,7 @@ body[data-theme="dark"] {
     --surface-floating: rgba(34, 28, 24, 0.92);
     --text-primary: #f8f3eb;
     --text-secondary: #cfc8b8;
-    --text-muted: rgba(207, 200, 184, 0.68);
+    --text-muted: rgba(207, 200, 184, 0.85);
     --accent: #d8b079;
     --accent-contrast: #1f1b17;
     --accent-soft: rgba(216, 176, 121, 0.35);
@@ -624,7 +624,7 @@ body[data-theme="dark"] {
         --surface-floating: rgba(34, 28, 24, 0.92);
         --text-primary: #f8f3eb;
         --text-secondary: #cfc8b8;
-        --text-muted: rgba(207, 200, 184, 0.68);
+        --text-muted: rgba(207, 200, 184, 0.85);
         --accent: #d8b079;
         --accent-contrast: #1f1b17;
         --accent-soft: rgba(216, 176, 121, 0.35);
@@ -653,8 +653,11 @@ body, .stApp {
     background-color: var(--background);
     color: var(--text-primary);
     font-family: "Spectral", "Georgia", "Times New Roman", serif;
-    font-size: 16px;
-    line-height: 1.6;
+    /* Fluid font size: 16px at 375px viewport, 18px at 1440px */
+    font-size: clamp(1rem, 0.9rem + 0.25vw, 1.125rem);
+    /* Optimal line height for readability */
+    line-height: 1.625;
+    max-width: 100%;
 }
 
 /* Prevent iOS zoom on input focus */
@@ -824,12 +827,37 @@ body.sidebar-open .app-shell.mobile-view .sidebar-panel {
     box-shadow: var(--shadow-soft);
     padding: 0.85rem 1rem;
     font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+    position: relative;
+    overflow: hidden;
 }
 
-.sidebar-panel button[data-testid="baseButton-primary"]:hover,
-.sidebar-panel button[data-testid="baseButton-primary"]:focus-visible {
+.sidebar-panel button[data-testid="baseButton-primary"]:hover {
     background: var(--button-bg-hover);
-    transform: scale(1.03);
+    box-shadow: var(--shadow-hover);
+    transform: translateY(-1px) scale(1.02);
+}
+
+.sidebar-panel button[data-testid="baseButton-primary"]:active {
+    background: var(--button-bg);
+    box-shadow: 0 2px 6px rgba(75, 46, 5, 0.15);
+    transform: translateY(0) scale(0.98);
+}
+
+.sidebar-panel button[data-testid="baseButton-primary"]:focus-visible {
+    outline: 2px solid var(--focus-outline);
+    outline-offset: 2px;
+    box-shadow: var(--shadow-soft), 0 0 0 4px rgba(75, 46, 5, 0.2);
+}
+
+.sidebar-panel button[data-testid="baseButton-primary"]:disabled {
+    background: var(--surface-elevated);
+    color: var(--text-muted);
+    cursor: not-allowed;
+    opacity: 0.6;
+    box-shadow: none;
+    transform: none;
 }
 
 .sidebar-panel button[data-testid="baseButton-secondary"] {
@@ -839,12 +867,35 @@ body.sidebar-open .app-shell.mobile-view .sidebar-panel {
     padding: 0.6rem 0.85rem;
     justify-content: flex-start;
     gap: 0.5rem;
+    cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease, border-color 0.2s ease;
 }
 
-.sidebar-panel button[data-testid="baseButton-secondary"]:hover,
-.sidebar-panel button[data-testid="baseButton-secondary"]:focus-visible {
+.sidebar-panel button[data-testid="baseButton-secondary"]:hover {
     box-shadow: var(--shadow-soft);
-    transform: scale(1.02);
+    transform: translateY(-1px);
+    border-color: var(--accent);
+    background: var(--surface-elevated);
+}
+
+.sidebar-panel button[data-testid="baseButton-secondary"]:active {
+    transform: translateY(0) scale(0.98);
+    box-shadow: none;
+}
+
+.sidebar-panel button[data-testid="baseButton-secondary"]:focus-visible {
+    outline: 2px solid var(--focus-outline);
+    outline-offset: 2px;
+    border-color: var(--accent);
+}
+
+.sidebar-panel button[data-testid="baseButton-secondary"]:disabled {
+    background: var(--surface-elevated);
+    color: var(--text-muted);
+    border-color: var(--divider);
+    cursor: not-allowed;
+    opacity: 0.5;
+    transform: none;
 }
 
 .chat-panel {
@@ -1015,14 +1066,40 @@ body[data-theme="dark"] .preview-pill {
     border: 1px solid rgba(0, 0, 0, 0.08);
 }
 
-.stChatMessage .stMarkdown p,
+.stChatMessage .stMarkdown p {
+    color: var(--text-primary) !important;
+    font-size: clamp(0.95rem, 0.9rem + 0.25vw, 1.05rem);
+    line-height: 1.7;
+    margin-bottom: 0.75em;
+    max-width: 65ch;
+}
+
+.stChatMessage .stMarkdown p:last-child {
+    margin-bottom: 0;
+}
+
 .stChatMessage .stMarkdown li {
     color: var(--text-primary) !important;
-    line-height: 1.68;
+    line-height: 1.6;
+    margin-bottom: 0.5rem;
+}
+
+.stChatMessage .stMarkdown ul,
+.stChatMessage .stMarkdown ol {
+    margin: 0.75em 0;
+    padding-left: 1.5em;
 }
 
 .stChatMessage .stMarkdown a {
     color: var(--accent);
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 2px;
+    transition: color 0.2s ease;
+}
+
+.stChatMessage .stMarkdown a:hover {
+    color: var(--button-bg-hover);
 }
 
 .feedback-wrapper {
@@ -1183,11 +1260,14 @@ button:disabled {
         position: fixed;
         left: 0;
         right: 0;
-        bottom: 0;
+        bottom: env(safe-area-inset-bottom, 0);
         width: 100%;
         margin: 0;
         border-radius: 20px 20px 0 0;
         z-index: 15;
+        max-height: 40vh;
+        overflow-y: auto;
+        transition: bottom 0.2s ease-out;
     }
 
     /* Ensure messages wrap properly on mobile */
@@ -1240,23 +1320,104 @@ body.sidebar-open {
     }
 }
 
+/* Smooth animations and micro-interactions */
 @keyframes messageFade {
     from {
         opacity: 0;
-        transform: translateY(6px);
+        transform: translateY(12px) scale(0.98);
     }
     to {
         opacity: 1;
-        transform: translateY(0);
+        transform: translateY(0) scale(1);
     }
 }
 
-@media (prefers-reduced-motion: reduce) {
-    * {
-        transition: none !important;
-        animation-duration: 0.001ms !important;
-        animation-iteration-count: 1 !important;
+@keyframes slideInFromLeft {
+    from {
+        transform: translateX(-100%);
+        opacity: 0;
     }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@keyframes shimmer {
+    0% {
+        background-position: -468px 0;
+    }
+    100% {
+        background-position: 468px 0;
+    }
+}
+
+/* Sidebar slide animation */
+.sidebar-panel {
+    animation: slideInFromLeft 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Smooth transitions for all interactive elements */
+button, .clickable, a, [role="button"] {
+    transition:
+        background-color 200ms cubic-bezier(0.4, 0, 0.2, 1),
+        transform 150ms cubic-bezier(0.4, 0, 0.2, 1),
+        box-shadow 200ms cubic-bezier(0.4, 0, 0.2, 1),
+        color 200ms cubic-bezier(0.4, 0, 0.2, 1),
+        border-color 200ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Respect user motion preferences */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+}
+
+/* Screen reader only content - accessible but visually hidden */
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0,0,0,0);
+    white-space: nowrap;
+    border-width: 0;
+}
+
+/* Skip to main content link - appears on focus for keyboard users */
+.skip-link {
+    position: absolute;
+    top: -40px;
+    left: 0;
+    background: var(--accent);
+    color: var(--accent-contrast);
+    padding: 0.5rem 1rem;
+    z-index: 100;
+    text-decoration: none;
+    border-radius: 0 0 8px 0;
+    font-weight: 600;
+    transition: top 0.2s ease;
+}
+
+.skip-link:focus {
+    top: 0;
 }
 
 #MainMenu,
@@ -1352,7 +1513,18 @@ footer {
             }
             btn.dataset.enhanced = 'true';
             btn.setAttribute('aria-label', 'Open navigation menu');
+            btn.setAttribute('aria-expanded', 'false');
+            btn.setAttribute('aria-controls', 'sidebar-panel');
             btn.setAttribute('title', 'Open navigation menu');
+            btn.setAttribute('type', 'button');
+
+            // Add keyboard navigation
+            btn.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    btn.click();
+                }
+            });
         });
 
         const sendButtons = Array.from(doc.querySelectorAll('[data-testid="stChatInput"] button[data-testid="baseButton-secondary"]'));
@@ -1369,6 +1541,50 @@ footer {
             span.textContent = 'Ask';
             btn.appendChild(span);
         });
+
+        // Add ARIA labels to primary buttons like "New Chat"
+        const primaryButtons = doc.querySelectorAll('[data-testid="baseButton-primary"]');
+        primaryButtons.forEach((btn) => {
+            if (!btn.getAttribute('aria-label') && btn.textContent.includes('New Chat')) {
+                btn.setAttribute('aria-label', 'Start new conversation');
+                btn.setAttribute('title', 'Start new conversation');
+            }
+        });
+
+        // Make chat messages keyboard focusable
+        const messages = doc.querySelectorAll('.stChatMessage');
+        messages.forEach((msg, idx) => {
+            if (!msg.getAttribute('tabindex')) {
+                msg.setAttribute('tabindex', '0');
+                msg.setAttribute('role', 'article');
+                msg.setAttribute('aria-label', `Message ${idx + 1}`);
+            }
+        });
+
+        // Add skip to main content link for keyboard users
+        if (!doc.getElementById('skip-to-main')) {
+            const skipLink = doc.createElement('a');
+            skipLink.id = 'skip-to-main';
+            skipLink.href = '#main-content';
+            skipLink.textContent = 'Skip to main content';
+            skipLink.className = 'skip-link';
+            skipLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                const main = doc.querySelector('main') || doc.querySelector('[role="main"]');
+                if (main) {
+                    main.setAttribute('tabindex', '-1');
+                    main.focus();
+                }
+            });
+            body.insertBefore(skipLink, body.firstChild);
+        }
+
+        // Mark main content area
+        const mainContent = doc.querySelector('main');
+        if (mainContent && !mainContent.id) {
+            mainContent.id = 'main-content';
+            mainContent.setAttribute('role', 'main');
+        }
     };
 
     const observer = new MutationObserver(() => {
@@ -1378,6 +1594,29 @@ footer {
     observer.observe(doc, { childList: true, subtree: true });
     enhanceButtons();
     window.__tcp_refresh_buttons = enhanceButtons;
+
+    // Mobile keyboard handling for iOS
+    if ('visualViewport' in window) {
+        const handleKeyboard = () => {
+            const chatInput = doc.querySelector('.chat-input-region [data-testid="stChatInput"]');
+            if (chatInput) {
+                const keyboardHeight = window.innerHeight - window.visualViewport.height;
+                if (keyboardHeight > 0) {
+                    // Keyboard is visible
+                    chatInput.style.bottom = `${keyboardHeight}px`;
+                } else {
+                    // Keyboard is hidden - use safe area inset
+                    chatInput.style.bottom = 'env(safe-area-inset-bottom, 0)';
+                }
+            }
+        };
+
+        window.visualViewport.addEventListener('resize', handleKeyboard);
+        window.visualViewport.addEventListener('scroll', handleKeyboard);
+
+        // Initial check
+        handleKeyboard();
+    }
 })();
 </script>
 """, unsafe_allow_html=True)
@@ -2045,44 +2284,60 @@ def _fallback_from_retrieval(
 
 
 def handle_question(question: str) -> Dict[str, Any]:
-    try:
-        doctrine_sources = retrieve_doctrinal_sources(question, top_k=3)
-    except (FileNotFoundError, ValueError) as exc:
-        logging.exception("Doctrinal retrieval failed: %s", exc)
-        doctrine_sources = []
+    # Create loading placeholder with progressive disclosure
+    with st.status("Processing your question...", expanded=True) as status:
+        st.write("🔍 Searching doctrinal sources...")
+        try:
+            doctrine_sources = retrieve_doctrinal_sources(question, top_k=3)
+            st.write(f"✓ Found {len(doctrine_sources)} doctrinal sources")
+        except (FileNotFoundError, ValueError) as exc:
+            st.write("⚠️ Doctrinal sources unavailable")
+            logging.exception("Doctrinal retrieval failed: %s", exc)
+            doctrine_sources = []
 
-    warnings: List[str] = []
-    try:
-        contextual_sources = retrieve_contextual_sources(question, top_k=2)
-    except (FileNotFoundError, ValueError) as exc:
-        logging.exception("Contextual retrieval failed: %s", exc)
-        contextual_sources = []
-        warnings.append("Contextual sources unavailable. Using core doctrine only.")
+        warnings: List[str] = []
+        st.write("🔍 Searching contextual sources...")
+        try:
+            contextual_sources = retrieve_contextual_sources(question, top_k=2)
+            st.write(f"✓ Found {len(contextual_sources)} contextual sources")
+        except (FileNotFoundError, ValueError) as exc:
+            st.write("⚠️ Contextual sources unavailable")
+            logging.exception("Contextual retrieval failed: %s", exc)
+            contextual_sources = []
+            warnings.append("Contextual sources unavailable. Using core doctrine only.")
 
-    context_sections: List[str] = []
-    if doctrine_sources:
-        context_sections.append(build_doctrinal_context(doctrine_sources))
-    if contextual_sources:
-        context_sections.append(build_contextual_context(contextual_sources))
+        st.write("📖 Building theological context...")
+        context_sections: List[str] = []
+        if doctrine_sources:
+            context_sections.append(build_doctrinal_context(doctrine_sources))
+        if contextual_sources:
+            context_sections.append(build_contextual_context(contextual_sources))
 
-    if not context_sections:
-        warnings.append("No doctrinal context found; providing faithful synthesis.")
-        context_for_llm = (
-            "Provide a biblically faithful, WELS-aligned response that "
-            "draws on Scripture, the Lutheran Confessions, and historic church teaching."
-        )
-    else:
-        context_for_llm = "\n\n".join(context_sections)
+        if not context_sections:
+            warnings.append("No doctrinal context found; providing faithful synthesis.")
+            context_for_llm = (
+                "Provide a biblically faithful, WELS-aligned response that "
+                "draws on Scripture, the Lutheran Confessions, and historic church teaching."
+            )
+        else:
+            context_for_llm = "\n\n".join(context_sections)
+        st.write("✓ Context prepared")
 
-    # Show spinner with encouraging Bible verse while generating response
-    with st.spinner(next(LOADING_VERSES)):
+        st.write(f"✍️ Synthesizing response... ({next(LOADING_VERSES)})")
         answer = synthesize_with_gpt(question, context_for_llm)
 
-    if answer is None:
-        warnings.append("Synthesis service unavailable; sharing retrieved teachings instead.")
-        answer = _fallback_from_retrieval(doctrine_sources, contextual_sources)
+        if answer is None:
+            st.write("⚠️ Using fallback response")
+            warnings.append("Synthesis service unavailable; sharing retrieved teachings instead.")
+            answer = _fallback_from_retrieval(doctrine_sources, contextual_sources)
+        else:
+            st.write("✓ Response generated")
 
-    tone_score = evaluate_tone(answer)
+        st.write("📊 Evaluating tone...")
+        tone_score = evaluate_tone(answer)
+        st.write("✓ Quality check complete")
+
+        status.update(label="Response ready!", state="complete", expanded=False)
 
     return {
         "role": "assistant",
@@ -2106,13 +2361,41 @@ def process_input(user_input_raw: str) -> None:
         return
 
     # Input validation: Check maximum length (2000 characters)
-    if len(user_input) > 2000:
-        st.error("Your question is too long. Please keep it under 2000 characters.")
+    MAX_CHARS = 2000
+    char_count = len(user_input)
+
+    if char_count > MAX_CHARS:
+        st.error(
+            f"⚠️ Your question is too long ({char_count}/{MAX_CHARS} characters).\n\n"
+            "Please shorten your question to under 2000 characters for better responses."
+        )
+        with st.expander("💡 Tips for shorter questions"):
+            st.markdown("""
+            - Focus on one main question at a time
+            - Remove unnecessary details
+            - Be specific and concise
+            - You can always ask follow-up questions
+            """)
         st.stop()
 
     # Input validation: Check minimum length
-    if len(user_input) < 3:
-        st.warning("Please ask a more detailed question.")
+    MIN_CHARS = 3
+    if char_count < MIN_CHARS:
+        st.warning(
+            f"📝 Your question is very brief ({char_count} characters).\n\n"
+            "Please provide more detail so we can give you a helpful answer."
+        )
+        with st.expander("💡 Tips for better questions"):
+            st.markdown("""
+            - Ask about specific theological topics
+            - Include context if helpful
+            - Be clear about what you want to understand
+
+            **Examples:**
+            - "What does the Bible say about prayer?"
+            - "How do I explain the Trinity to my child?"
+            - "What is the Lutheran view on Holy Communion?"
+            """)
         st.stop()
 
     # Initialize rate limiting session state

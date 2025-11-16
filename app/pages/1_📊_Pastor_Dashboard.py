@@ -32,6 +32,99 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# Add mobile-responsive CSS
+st.markdown("""
+<style>
+/* Mobile-First Responsive Styles for Pastor Dashboard */
+
+/* Ensure proper font sizing on mobile */
+@media (max-width: 768px) {
+    /* Make metrics stack vertically */
+    [data-testid="column"] {
+        width: 100% !important;
+        flex: 0 0 100% !important;
+        min-width: 100% !important;
+        margin-bottom: 1rem;
+    }
+
+    /* Full-width filters and inputs */
+    .stSelectbox, .stTextInput, .stTextArea {
+        width: 100% !important;
+    }
+
+    /* Improve touch targets for mobile */
+    button {
+        min-height: 44px;
+        min-width: 44px;
+        padding: 0.75rem 1rem;
+        font-size: 16px;
+    }
+
+    /* Horizontal scroll for tables */
+    .dataframe {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        display: block;
+    }
+
+    /* Improve expander readability */
+    .streamlit-expanderHeader {
+        font-size: 0.9rem;
+        line-height: 1.4;
+        padding: 0.75rem;
+    }
+
+    /* Text areas full width */
+    textarea {
+        width: 100% !important;
+        max-width: 100% !important;
+        font-size: 16px !important;
+    }
+
+    /* Stack columns inside expanders */
+    .stExpander [data-testid="column"] {
+        width: 100% !important;
+        flex: 0 0 100% !important;
+    }
+
+    /* Better spacing for mobile */
+    .stMarkdown h1 {
+        font-size: 1.5rem;
+    }
+
+    .stMarkdown h2 {
+        font-size: 1.25rem;
+    }
+
+    .stMarkdown h3 {
+        font-size: 1.1rem;
+    }
+
+    /* Metrics cards */
+    [data-testid="metric-container"] {
+        padding: 1rem;
+    }
+}
+
+/* Tablet breakpoint */
+@media (min-width: 769px) and (max-width: 1024px) {
+    [data-testid="column"] {
+        flex: 0 0 50% !important;
+        width: 50% !important;
+    }
+}
+
+/* Better focus states for accessibility */
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+    outline: 2px solid #1e3a8a;
+    outline-offset: 2px;
+}
+</style>
+""", unsafe_allow_html=True)
+
 # Initialize authentication state
 if "pastor_authenticated" not in st.session_state:
     st.session_state.pastor_authenticated = False
@@ -56,13 +149,30 @@ def check_authentication():
     col1, col2 = st.columns([1, 4])
     with col1:
         if st.button("Login", type="primary", use_container_width=True):
-            correct_password = os.getenv("PASTOR_PASSWORD", "faith2025!")
+            correct_password = os.getenv("PASTOR_PASSWORD")
+
+            if not correct_password:
+                st.error(
+                    "⚠️ Dashboard authentication is not configured. "
+                    "Please contact your system administrator."
+                )
+                st.stop()
 
             if password == correct_password:
                 st.session_state.pastor_authenticated = True
                 st.success("Authentication successful!")
                 st.rerun()
             else:
+                # Track failed login attempts for rate limiting
+                if "failed_login_attempts" not in st.session_state:
+                    st.session_state.failed_login_attempts = 0
+
+                st.session_state.failed_login_attempts += 1
+
+                if st.session_state.failed_login_attempts >= 5:
+                    st.error("⚠️ Too many failed attempts. Please try again later.")
+                    st.stop()
+
                 st.error("Incorrect password. Please try again.")
 
     return False
@@ -88,23 +198,63 @@ with col2:
 
 # Load questions from JSONL file
 def load_questions() -> List[Dict[str, Any]]:
-    """Load all questions from review queue."""
+    """Load all questions from review queue with comprehensive error handling."""
     # Use absolute path from project root
     project_root = Path(__file__).parent.parent.parent
     questions_file = project_root / "data" / "metrics" / "review_queue.jsonl"
 
     if not questions_file.exists():
+        st.info(
+            "📭 No questions have been submitted yet.\n\n"
+            "Questions will appear here after users interact with the chat interface."
+        )
         return []
 
     questions = []
+    parse_errors = 0
+
     try:
         with questions_file.open("r", encoding="utf-8") as f:
-            for line in f:
+            for line_num, line in enumerate(f, 1):
                 line = line.strip()
                 if line:
-                    questions.append(json.loads(line))
+                    try:
+                        questions.append(json.loads(line))
+                    except json.JSONDecodeError as e:
+                        parse_errors += 1
+                        import logging
+                        logging.warning(f"Skipping malformed JSON on line {line_num}: {e}")
+
+    except PermissionError:
+        st.error(
+            "🔒 Permission denied when accessing question database.\n\n"
+            "Please ensure the application has read permissions for:\n"
+            f"`{questions_file}`"
+        )
+        return []
+
     except Exception as e:
-        st.error(f"Error loading questions: {e}")
+        st.error(
+            "⚠️ Unexpected error loading questions.\n\n"
+            f"**Error type:** {type(e).__name__}\n"
+            f"**Error message:** {str(e)}\n\n"
+            "Please contact your system administrator."
+        )
+        import logging
+        import traceback
+        logging.exception("Failed to load questions")
+
+        # Show detailed error in expander for debugging
+        with st.expander("🔍 Technical Details"):
+            st.code(traceback.format_exc(), language="python")
+
+        return []
+
+    if parse_errors > 0:
+        st.warning(
+            f"⚠️ {parse_errors} malformed entries were skipped. "
+            "Showing only valid questions."
+        )
 
     return questions
 
@@ -425,10 +575,55 @@ else:
                         st.code(traceback.format_exc())
 
             with col2:
-                # Reject button - for future use
-                if st.button("❌ Reject", key=f"reject_{i}", use_container_width=True):
-                    st.warning("⚠️ Rejected - will not use for training")
-                    st.info("(Future: This will move to rejected items)")
+                # Reject button with confirmation dialog
+                reject_key = f"reject_{response_id}"
+
+                # Initialize confirmation state
+                if "confirm_reject" not in st.session_state:
+                    st.session_state.confirm_reject = {}
+
+                # Check if we're in confirmation mode for this question
+                if reject_key in st.session_state.confirm_reject:
+                    st.warning("⚠️ Are you sure you want to reject this question?")
+                    st.caption("This action cannot be undone. The question will not be used for training.")
+
+                    sub_col1, sub_col2 = st.columns(2)
+                    with sub_col1:
+                        if st.button("✓ Yes, Reject", key=f"confirm_reject_yes_{i}", type="primary", use_container_width=True):
+                            try:
+                                # Create rejected entry
+                                rejected_entry = {
+                                    "response_id": response_id,
+                                    "question": question_text,
+                                    "answer": answer_text,
+                                    "topic": topic,
+                                    "rejected_at": datetime.now().isoformat(),
+                                    "rejected_by": st.session_state.get("pastor_username", "unknown")
+                                }
+
+                                # Save to rejected log
+                                rejected_log_path = Path(__file__).parent.parent.parent / "data" / "metrics" / "rejected_questions.jsonl"
+                                rejected_log_path.parent.mkdir(parents=True, exist_ok=True)
+
+                                with rejected_log_path.open("a", encoding="utf-8") as f:
+                                    f.write(json.dumps(rejected_entry, ensure_ascii=True) + "\n")
+
+                                st.success("✓ Question rejected and logged")
+                                del st.session_state.confirm_reject[reject_key]
+                                st.rerun()
+
+                            except Exception as e:
+                                st.error(f"Failed to log rejection: {e}")
+
+                    with sub_col2:
+                        if st.button("✗ Cancel", key=f"confirm_reject_no_{i}", use_container_width=True):
+                            del st.session_state.confirm_reject[reject_key]
+                            st.rerun()
+                else:
+                    # Show initial reject button
+                    if st.button("❌ Reject", key=f"reject_{i}", use_container_width=True):
+                        st.session_state.confirm_reject[reject_key] = True
+                        st.rerun()
 
 st.divider()
 

@@ -10,7 +10,10 @@
       "WebFetch(domain:wels.net)",
       "WebFetch(domain:forwardinchrist.net)",
       "WebFetch(domain:welsrc.net)",
-      "WebFetch(domain:whataboutjesus.com)"
+      "WebFetch(domain:whataboutjesus.com)",
+      "Bash(find:*)",
+      "Bash(mkdir:*)",
+      "Bash(mv:*)"
     ],
     "deny": [],
     "ask": []

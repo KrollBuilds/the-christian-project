@@ -535,8 +535,11 @@ else:
                     try:
                         # If topic was changed, update it in review queue first
                         if selected_topic != topic:
+                            st.info(f"Updating topic in review queue: {response_id} → {selected_topic}")
                             update_success = update_review_queue_topic(response_id, selected_topic)
-                            if not update_success:
+                            if update_success:
+                                st.success(f"✓ Topic updated in review queue to '{selected_topic}'")
+                            else:
                                 st.warning("⚠️ Topic update in review queue failed, but continuing with approval...")
 
                         # Save the approved question with edited response and topic
@@ -563,6 +566,11 @@ else:
                                 st.write("**File Location:**", result["file_path"])
                                 st.write("**File Size:**", f"{result.get('file_size', 0)} bytes")
                                 st.info(f"✓ {result['message']}")
+
+                            # Force page reload to show updated topics
+                            import time
+                            time.sleep(2)  # Give user time to see the success message
+                            st.rerun()
                         else:
                             st.error(f"❌ Failed to save to training dataset!")
                             st.error(f"Error: {result['message']}")
@@ -683,7 +691,8 @@ else:
     st.subheader("Topic Distribution")
     topic_counts = {}
     for q in filtered_questions:
-        topic = q.get("topic_cluster", "general")
+        # Normalize to proper case for consistent grouping
+        topic = q.get("topic_cluster", "General").title()
         topic_counts[topic] = topic_counts.get(topic, 0) + 1
 
     if topic_counts:

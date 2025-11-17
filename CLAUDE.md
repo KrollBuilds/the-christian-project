@@ -4,3 +4,4 @@
 
   # Train on entries from last 30 days only
   python3 scripts/build_training_dataset.py --days 30
+- Always add a TLDR; version of your reports

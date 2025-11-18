@@ -223,7 +223,22 @@ def load_questions() -> List[Dict[str, Any]]:
                     except json.JSONDecodeError as e:
                         parse_errors += 1
                         import logging
-                        logging.warning(f"Skipping malformed JSON on line {line_num}: {e}")
+                        # Log the error with the problematic content for debugging
+                        logging.warning(
+                            f"Skipping malformed JSON on line {line_num}: {e}\n"
+                            f"Content preview: {line[:200]}"
+                        )
+                        # Also save to a separate error log for investigation
+                        error_log = questions_file.parent / "malformed_entries.log"
+                        with error_log.open("a", encoding="utf-8") as ef:
+                            from datetime import datetime
+                            ef.write(
+                                f"\n{'='*60}\n"
+                                f"Time: {datetime.now().isoformat()}\n"
+                                f"Line: {line_num}\n"
+                                f"Error: {e}\n"
+                                f"Content: {line}\n"
+                            )
 
     except PermissionError:
         st.error(

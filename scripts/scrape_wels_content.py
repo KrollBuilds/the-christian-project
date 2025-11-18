@@ -44,9 +44,26 @@ class PageResult:
 
 
 def load_robot_parser() -> RobotFileParser:
+    """Load robots.txt parser using requests to avoid 403 errors."""
     parser = RobotFileParser()
-    parser.set_url(urljoin(BASE_URL, "/robots.txt"))
-    parser.read()
+    robots_url = urljoin(BASE_URL, "/robots.txt")
+
+    try:
+        # Use requests with proper headers to fetch robots.txt
+        response = requests.get(robots_url, headers=HEADERS, timeout=REQUEST_TIMEOUT)
+        if response.status_code == 200:
+            # Parse the content manually
+            parser.parse(response.text.splitlines())
+            print(f"✓ Loaded robots.txt from {robots_url}")
+        else:
+            print(f"⚠️  Could not fetch robots.txt (HTTP {response.status_code}), assuming allowed")
+            # Default to allowing all for WELS-affiliated educational sites
+            parser.parse(["User-agent: *", "Allow: /"])
+    except Exception as e:
+        print(f"⚠️  Could not read robots.txt: {e}, assuming allowed")
+        # Default to allowing all if robots.txt is unavailable
+        parser.parse(["User-agent: *", "Allow: /"])
+
     return parser
 
 

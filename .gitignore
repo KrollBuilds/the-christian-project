@@ -1,6 +1,41 @@
 # Security
 .env
 .env.*
+.env.local
+
+# Python
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+
+# Virtual environments
+mlenv/
+venv/
+.venv/
+env/
+
+# Caches
 .cache/
+data/cache/
+.pytest_cache/
+*.egg-info/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs (runtime generated)
+logs/
+*.log
+
+# HF Spaces will regenerate these
+data/metrics/

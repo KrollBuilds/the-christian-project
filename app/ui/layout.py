@@ -7,7 +7,7 @@ from typing import Callable
 
 import streamlit as st
 
-from app.config.theme import apply_theme_to_dom, ensure_theme
+from app.app_config.theme import apply_theme_to_dom, ensure_theme
 
 
 _CSS_PATH = Path(__file__).with_name("layout.css")

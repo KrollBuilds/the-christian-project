@@ -1143,18 +1143,19 @@ body[data-theme="dark"] .preview-pill {
 
 .chat-input-region textarea {
     background: var(--input-bg) !important;
-    border-radius: 14px !important;
+    border-radius: 8px !important;
     border: 1px solid var(--input-border) !important;
     color: var(--text-primary) !important;
-    padding: 0.9rem 1.1rem !important;
+    padding: 0.75rem 1rem !important;
     font-size: 1rem !important;
     font-family: var(--font-ui) !important;
-    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    transition: border-color 0.15s ease;
 }
 
 .chat-input-region textarea:focus-visible {
     border-color: var(--accent) !important;
-    box-shadow: 0 0 0 3px var(--accent-soft) !important;
+    box-shadow: none !important;
+    outline: none !important;
 }
 
 .chat-input-region textarea::placeholder {
@@ -1996,15 +1997,16 @@ body[data-theme="dark"] .stChatMessage[data-testid="stChatMessage-User"] > div {
 .stChatInput textarea {
     background: var(--input-bg) !important;
     border: 1px solid var(--input-border) !important;
-    border-radius: 14px !important;
-    padding: 0.85rem 1rem !important;
+    border-radius: 8px !important;
+    padding: 0.75rem 1rem !important;
     color: var(--text-primary) !important;
     font-family: var(--font-ui) !important;
 }
 
 .stChatInput textarea:focus-visible {
     border-color: var(--accent) !important;
-    box-shadow: 0 0 0 3px var(--accent-soft) !important;
+    box-shadow: none !important;
+    outline: none !important;
 }
 
 .stChatInput button[data-testid="baseButton-secondary"] {
@@ -2415,29 +2417,22 @@ def _fallback_from_retrieval(
 
 
 def handle_question(question: str) -> Dict[str, Any]:
-    # Create loading placeholder with progressive disclosure
-    with st.status("Processing your question...", expanded=True) as status:
-        st.write("🔍 Searching doctrinal sources...")
+    # Simple spinner - no verbose status messages
+    with st.spinner(""):
         try:
             doctrine_sources = retrieve_doctrinal_sources(question, top_k=3)
-            st.write(f"✓ Found {len(doctrine_sources)} doctrinal sources")
         except (FileNotFoundError, ValueError) as exc:
-            st.write("⚠️ Doctrinal sources unavailable")
             logging.exception("Doctrinal retrieval failed: %s", exc)
             doctrine_sources = []
 
         warnings: List[str] = []
-        st.write("🔍 Searching contextual sources...")
         try:
             contextual_sources = retrieve_contextual_sources(question, top_k=2)
-            st.write(f"✓ Found {len(contextual_sources)} contextual sources")
         except (FileNotFoundError, ValueError) as exc:
-            st.write("⚠️ Contextual sources unavailable")
             logging.exception("Contextual retrieval failed: %s", exc)
             contextual_sources = []
             warnings.append("Contextual sources unavailable. Using core doctrine only.")
 
-        st.write("📖 Building theological context...")
         context_sections: List[str] = []
         if doctrine_sources:
             context_sections.append(build_doctrinal_context(doctrine_sources))
@@ -2452,23 +2447,14 @@ def handle_question(question: str) -> Dict[str, Any]:
             )
         else:
             context_for_llm = "\n\n".join(context_sections)
-        st.write("✓ Context prepared")
 
-        st.write(f"✍️ Synthesizing response... ({next(LOADING_VERSES)})")
         answer = synthesize_with_gpt(question, context_for_llm)
 
         if answer is None:
-            st.write("⚠️ Using fallback response")
             warnings.append("Synthesis service unavailable; sharing retrieved teachings instead.")
             answer = _fallback_from_retrieval(doctrine_sources, contextual_sources)
-        else:
-            st.write("✓ Response generated")
 
-        st.write("📊 Evaluating tone...")
         tone_score = evaluate_tone(answer)
-        st.write("✓ Quality check complete")
-
-        status.update(label="Response ready!", state="complete", expanded=False)
 
     return {
         "role": "assistant",

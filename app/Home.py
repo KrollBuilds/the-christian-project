@@ -196,7 +196,8 @@ def inject_pwa_metadata() -> None:
         ['apple-mobile-web-app-capable', 'yes'],
         ['apple-mobile-web-app-status-bar-style', 'black-translucent'],
         ['apple-mobile-web-app-title', 'The Christian Project'],
-        ['description', 'Faithful answers for curious hearts.']
+        ['description', 'Faithful answers for curious hearts.'],
+        ['viewport', 'width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no']
     ];
     metaPairs.forEach(([name, content]) => {
         let meta = head.querySelector(`meta[name='${name}']`);
@@ -1046,12 +1047,13 @@ body[data-theme="dark"] .preview-pill {
 }
 
 .stChatMessage > div {
-    max-width: 90%;
-    padding: 0.85rem 1.15rem;
-    border-radius: 18px;
+    max-width: 88%;
+    padding: 1rem 1.25rem;
+    border-radius: 20px;
     box-shadow: 0 8px 18px rgba(0, 0, 0, 0.08);
     animation: messageFade 0.25s ease-out;
     backdrop-filter: blur(0.25px);
+    margin-bottom: 0.5rem;
 }
 
 .stChatMessage[data-testid="stChatMessage-Assistant"] > div {
@@ -1240,8 +1242,10 @@ button:disabled {
     .app-shell.mobile-view .trust-panel,
     .app-shell.mobile-view .chat-scroll,
     .app-shell.mobile-view .doctrinal-footer {
-        margin-left: 0.75rem;
-        margin-right: 0.75rem;
+        margin-left: 1rem;
+        margin-right: 1rem;
+        padding-left: 0.25rem;
+        padding-right: 0.25rem;
     }
 
     .app-shell.mobile-view .chat-header-actions {
@@ -1263,22 +1267,52 @@ button:disabled {
         bottom: env(safe-area-inset-bottom, 0);
         width: 100%;
         margin: 0;
-        border-radius: 20px 20px 0 0;
+        border-radius: 24px 24px 0 0;
         z-index: 15;
-        max-height: 40vh;
+        max-height: 45vh;
         overflow-y: auto;
         transition: bottom 0.2s ease-out;
+        padding: 1rem 1rem 1.25rem !important;
+        box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.12);
     }
 
-    /* Ensure messages wrap properly on mobile */
+    /* Larger textarea on mobile for better touch */
+    .app-shell.mobile-view .chat-input-region textarea {
+        min-height: 52px !important;
+        padding: 0.9rem 1rem !important;
+        font-size: 16px !important;
+        border-radius: 16px !important;
+    }
+
+    /* Larger send button on mobile */
+    .app-shell.mobile-view .chat-input-region button[data-testid="baseButton-secondary"] {
+        min-height: 52px !important;
+        min-width: 52px !important;
+        padding: 0 1.25rem !important;
+    }
+
+    /* Mobile message bubbles - more spacious and readable */
     .stChatMessage > div {
-        max-width: 95% !important;
+        max-width: 92% !important;
         word-wrap: break-word;
+        padding: 1.1rem 1.35rem !important;
+        margin-bottom: 0.75rem !important;
+        border-radius: 22px !important;
     }
 
-    /* Adjust padding for mobile */
+    .stChatMessage .stMarkdown p {
+        font-size: 1rem !important;
+        line-height: 1.75 !important;
+    }
+
+    /* More space between messages */
+    .stChatMessage {
+        margin-bottom: 0.5rem !important;
+    }
+
+    /* Adjust padding for mobile - increased horizontal space */
     main .block-container {
-        padding: 1rem 0.75rem 6rem;
+        padding: 1.25rem 1rem 7rem;
     }
 
     /* Ensure sidebar is accessible on mobile */
@@ -1595,24 +1629,121 @@ footer {
     enhanceButtons();
     window.__tcp_refresh_buttons = enhanceButtons;
 
-    // Mobile keyboard handling for iOS
+    // Mobile keyboard handling for iOS and Android
     if ('visualViewport' in window) {
+        let keyboardVisible = false;
+        let dismissBar = null;
+
+        const blurActiveInput = () => {
+            const activeEl = doc.activeElement;
+            if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA')) {
+                activeEl.blur();
+            }
+        };
+
+        const createDismissBar = () => {
+            if (dismissBar) return dismissBar;
+
+            // Create a "Done" bar that appears above the keyboard
+            dismissBar = doc.createElement('div');
+            dismissBar.id = 'tcp-keyboard-dismiss-bar';
+            dismissBar.innerHTML = `
+                <button type="button" id="tcp-done-btn">Done</button>
+            `;
+            dismissBar.style.cssText = `
+                position: fixed;
+                left: 0;
+                right: 0;
+                height: 44px;
+                background: var(--surface-header, #f1e9dc);
+                border-top: 1px solid var(--divider, rgba(75, 46, 5, 0.2));
+                display: none;
+                align-items: center;
+                justify-content: flex-end;
+                padding: 0 1rem;
+                z-index: 16;
+                box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.08);
+            `;
+
+            const doneBtn = dismissBar.querySelector('#tcp-done-btn');
+            doneBtn.style.cssText = `
+                background: transparent;
+                border: none;
+                color: var(--accent, #4b2e05);
+                font-weight: 600;
+                font-size: 1rem;
+                padding: 0.5rem 1rem;
+                cursor: pointer;
+                font-family: var(--font-ui, sans-serif);
+            `;
+            doneBtn.addEventListener('click', blurActiveInput);
+
+            doc.body.appendChild(dismissBar);
+            return dismissBar;
+        };
+
         const handleKeyboard = () => {
             const chatInput = doc.querySelector('.chat-input-region [data-testid="stChatInput"]');
+            const chatScroll = doc.querySelector('.chat-scroll');
+            const mainContainer = doc.querySelector('main .block-container');
+            const keyboardHeight = window.innerHeight - window.visualViewport.height;
+            const wasKeyboardVisible = keyboardVisible;
+            keyboardVisible = keyboardHeight > 100; // Threshold to avoid false positives
+
             if (chatInput) {
-                const keyboardHeight = window.innerHeight - window.visualViewport.height;
-                if (keyboardHeight > 0) {
-                    // Keyboard is visible
-                    chatInput.style.bottom = `${keyboardHeight}px`;
+                if (keyboardVisible) {
+                    // Keyboard is visible - adjust input position and scroll
+                    const inputBottom = keyboardHeight;
+                    chatInput.style.bottom = `${inputBottom}px`;
+
+                    // Show dismiss bar just above the input
+                    const bar = createDismissBar();
+                    bar.style.display = 'flex';
+                    bar.style.bottom = `${inputBottom + chatInput.offsetHeight}px`;
+
+                    // Add extra padding to main content so messages aren't hidden
+                    if (mainContainer) {
+                        mainContainer.style.paddingBottom = `${keyboardHeight + 140}px`;
+                    }
+
+                    // Auto-scroll to show latest message
+                    if (chatScroll && !wasKeyboardVisible) {
+                        setTimeout(() => {
+                            chatScroll.scrollTop = chatScroll.scrollHeight;
+                        }, 100);
+                    }
                 } else {
-                    // Keyboard is hidden - use safe area inset
+                    // Keyboard is hidden - reset everything
                     chatInput.style.bottom = 'env(safe-area-inset-bottom, 0)';
+
+                    // Hide dismiss bar
+                    if (dismissBar) {
+                        dismissBar.style.display = 'none';
+                    }
+
+                    if (mainContainer) {
+                        mainContainer.style.paddingBottom = '';
+                    }
+
                 }
             }
         };
 
         window.visualViewport.addEventListener('resize', handleKeyboard);
         window.visualViewport.addEventListener('scroll', handleKeyboard);
+
+        // Also handle focus events for additional reliability
+        doc.addEventListener('focusin', (e) => {
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+                setTimeout(handleKeyboard, 300);
+            }
+        });
+
+        doc.addEventListener('focusout', (e) => {
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+                setTimeout(handleKeyboard, 100);
+            }
+        });
 
         // Initial check
         handleKeyboard();

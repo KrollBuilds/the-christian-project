@@ -1,0 +1,1 @@
+All scraped material in this directory comes from publicly available WELS resources and is used for research and educational purposes under fair use. Attribution and theological integrity are preserved.

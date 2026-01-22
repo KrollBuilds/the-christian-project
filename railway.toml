@@ -1,0 +1,16 @@
+# Railway configuration for The Christian Project
+# This configuration supports multi-page Streamlit deployment
+
+[build]
+builder = "nixpacks"
+
+[deploy]
+# Start the main Streamlit app (Home.py)
+# Streamlit will automatically detect pages/ directory for multi-page support
+startCommand = "streamlit run app/Home.py --server.port=8080 --server.address=0.0.0.0"
+
+# Health check configuration
+healthcheckPath = "/"
+healthcheckTimeout = 100
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 10

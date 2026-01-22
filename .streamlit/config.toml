@@ -1,0 +1,10 @@
+[server]
+maxUploadSize = 5
+headless = true
+enableCORS = false
+enableXsrfProtection = true
+port = 8080
+enableStaticServing = true
+
+[browser]
+gatherUsageStats = false

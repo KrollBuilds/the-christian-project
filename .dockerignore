@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.mlenv/
+data/raw/
+data/processed/vector_store/*
+!data/processed/vector_store/combined_faiss.index
+!data/processed/vector_store/combined_metadata.json
+!data/processed/vector_store/qa_faiss.index
+!data/processed/vector_store/qa_metadata.json
+logs/

@@ -17,6 +17,7 @@ COPY . /app
 
 # Runtime configuration
 ENV PYTHONUNBUFFERED=1
+ENV PYTHONPATH=/app
 ENV STREAMLIT_SERVER_HEADLESS=true
 
 # HF Spaces requires port 7860

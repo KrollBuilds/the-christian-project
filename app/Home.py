@@ -1876,6 +1876,12 @@ section[data-testid="stSidebar"] button[data-testid="baseButton-secondary"] {
     text-align: center;
 }
 
+/* Hide duplicate headers that appear during Streamlit reruns */
+.chat-header ~ .chat-header,
+.chat-wrapper ~ .chat-wrapper .chat-header {
+    display: none !important;
+}
+
 .chat-header-identity {
     display: flex;
     align-items: center;
@@ -2036,6 +2042,12 @@ body[data-theme="dark"] .stChatMessage[data-testid="stChatMessage-User"] > div {
     color: var(--text-muted);
     text-align: center;
     font-family: var(--font-ui);
+}
+
+/* Hide duplicate footers and trust panels during Streamlit reruns */
+.doctrinal-footer ~ .doctrinal-footer,
+.trust-panel ~ .trust-panel {
+    display: none !important;
 }
 
 @media (max-width: 900px) {

@@ -131,8 +131,8 @@ def append_pastoral_guidance(text: str) -> str:
 
 # ---------------------------------------------------------------------
 # Index resolver
-def _resolve_doctrine_paths() -> Tuple[Path, Path, str]:
-    """Determine which doctrinal FAISS index to use."""
+def _resolve_doctrine_paths() -> Tuple[Optional[Path], Optional[Path], str]:
+    """Determine which doctrinal FAISS index to use. Returns None paths if none found."""
     if WELS_INDEX_PATH.exists() and WELS_METADATA_PATH.exists():
         logger.info("Using new WELS doctrinal index (wels_faiss.index).")
         return WELS_INDEX_PATH, WELS_METADATA_PATH, "wels"
@@ -142,7 +142,8 @@ def _resolve_doctrine_paths() -> Tuple[Path, Path, str]:
     if QA_INDEX_PATH.exists() and QA_METADATA_PATH.exists():
         logger.info("Using legacy QA doctrinal index (qa_faiss.index).")
         return QA_INDEX_PATH, QA_METADATA_PATH, "qa"
-    raise FileNotFoundError("No doctrinal FAISS index found (wels / combined / qa).")
+    logger.warning("No doctrinal FAISS index found - RAG retrieval disabled, using GPT only.")
+    return None, None, "none"
 
 DOCTRINE_INDEX_PATH, DOCTRINE_METADATA_PATH, DOCTRINE_INDEX_LABEL = _resolve_doctrine_paths()
 
@@ -166,10 +167,14 @@ def _load_index_and_metadata(index_path: Path, metadata_path: Path, label: str) 
         raise ValueError(f"{label.capitalize()} metadata is empty or malformed.")
     return index, metadata
 
-def get_cached_doctrine_index() -> Tuple[faiss.Index, List[dict]]:
+def get_cached_doctrine_index() -> Tuple[Optional[faiss.Index], List[dict]]:
     global _QA_CACHE
     if _QA_CACHE is None:
-        _QA_CACHE = _load_index_and_metadata(DOCTRINE_INDEX_PATH, DOCTRINE_METADATA_PATH, DOCTRINE_INDEX_LABEL)
+        if DOCTRINE_INDEX_PATH is None or DOCTRINE_METADATA_PATH is None:
+            logger.info("No doctrine index available - RAG disabled.")
+            _QA_CACHE = (None, [])
+        else:
+            _QA_CACHE = _load_index_and_metadata(DOCTRINE_INDEX_PATH, DOCTRINE_METADATA_PATH, DOCTRINE_INDEX_LABEL)
     return _QA_CACHE
 
 def get_cached_context_index() -> Tuple[Optional[faiss.Index], List[dict]]:
@@ -230,6 +235,8 @@ def build_contextual_context(entries: List[Dict[str, object]]) -> str:
 # Main retrieval interfaces
 def retrieve_doctrinal_sources(question: str, top_k: int = 3) -> List[Dict[str, object]]:
     index, metadata = get_cached_doctrine_index()
+    if index is None or not metadata:
+        return []  # No index available, return empty
     model = get_embedding_model()
     scores, idxs = retrieve_similar(question, model, index, top_k)
     results: List[Dict[str, object]] = []

@@ -298,21 +298,74 @@ def query_with_gpt(
 
 
 def evaluate_tone(answer: Optional[str]) -> float:
-    """Return a simple tone score between 0 and 1 based on keyword presence."""
+    """
+    Score a response 0.0–1.0 for use in auto-training decisions.
+
+    Factors:
+    - Baseline 0.5
+    - Pastoral/positive language: +0.05 per keyword (capped at 7 markers)
+    - Concerning language: -0.05 per keyword
+    - Scripture references: +0.05 (signals doctrinal grounding)
+    - Pastoral phrases: +0.03 each, up to 2
+    - Length: penalty for very short (<100 chars), bonus for ideal (200-600)
+    - Fallback/error responses: immediate 0.0
+    """
     if not answer:
         return 0.5
 
+    # Responses that are error/fallback states should never train
     lower = answer.lower()
-    positive_markers = ["grace", "hope", "love", "comfort", "encourage", "peace", "forgive"]
-    negative_markers = ["anger", "condemn", "harsh", "rebuke", "wrath", "punish"]
+    fallback_signals = [
+        "temporarily unavailable",
+        "please check back",
+        "system is unavailable",
+        "retrieval system",
+    ]
+    if any(sig in lower for sig in fallback_signals):
+        return 0.0
 
     score = 0.5
+
+    # Pastoral positive markers
+    positive_markers = [
+        "grace", "hope", "love", "comfort", "encourage", "peace", "forgive",
+        "merciful", "faithful", "blessed", "salvation", "redeemed",
+    ]
     for token in positive_markers:
         if token in lower:
             score += 0.05
+
+    # Concerning language
+    negative_markers = ["anger", "condemn", "harsh", "rebuke", "wrath", "punish", "hell"]
     for token in negative_markers:
         if token in lower:
             score -= 0.05
+
+    # Scripture reference presence (book:chapter pattern, or named books)
+    import re
+    scripture_pattern = re.compile(
+        r'\b(?:psalm|matthew|john|romans|genesis|luke|acts|hebrews|'
+        r'corinthians|ephesians|philippians|isaiah|jeremiah|proverbs)'
+        r'|\d+\s*:\s*\d+',
+        re.IGNORECASE,
+    )
+    if scripture_pattern.search(answer):
+        score += 0.05
+
+    # Pastoral engagement phrases
+    pastoral_phrases = [
+        "scripture teaches", "god's word", "pray", "trust in",
+        "according to", "wels", "lutheran", "confess",
+    ]
+    pastoral_hits = sum(1 for p in pastoral_phrases if p in lower)
+    score += min(pastoral_hits, 2) * 0.03
+
+    # Length-based quality signal
+    char_count = len(answer)
+    if char_count < 100:
+        score -= 0.10  # Too short — probably incomplete
+    elif 200 <= char_count <= 600:
+        score += 0.05  # Ideal answer length
 
     return max(0.0, min(1.0, score))
 

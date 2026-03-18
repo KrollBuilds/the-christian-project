@@ -1,4 +1,9 @@
 {
+  "env": {
+    "CLAUDE_CODE_MAX_OUTPUT_TOKENS": "8000",
+    "DISABLE_NON_ESSENTIAL_MODEL_CALLS": "1",
+    "DISABLE_COST_WARNINGS": "1"
+  },
   "permissions": {
     "allow": [
       "Bash(cat:*)",
@@ -23,7 +28,11 @@
       "Bash(git branch:*)",
       "Bash(git fetch:*)",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(mlenv/bin/pip show:*)",
+      "Bash(mlenv/bin/pip install:*)",
+      "Bash(mlenv/bin/pip3.13 install:*)",
+      "Bash(mlenv/bin/streamlit run:*)"
     ],
     "deny": [],
     "ask": []
@@ -31,10 +40,5 @@
   "statusLine": {
     "type": "command",
     "command": "python3 .claude/scripts/context-monitor.py"
-  },
-  "env": {
-    "CLAUDE_CODE_MAX_OUTPUT_TOKENS": "8000",
-    "DISABLE_NON_ESSENTIAL_MODEL_CALLS": "1",
-    "DISABLE_COST_WARNINGS": "1"
   }
 }

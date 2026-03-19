@@ -10,7 +10,7 @@ ThemeName = Literal["light", "dark"]
 
 _THEME_KEY = "ui_theme"
 _TOGGLE_SYNC_KEY = "ui_theme_toggle"
-_DEFAULT_THEME: ThemeName = "light"
+_DEFAULT_THEME: ThemeName = "dark"
 
 
 def ensure_theme(default: ThemeName = _DEFAULT_THEME) -> ThemeName:

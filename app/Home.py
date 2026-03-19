@@ -635,13 +635,13 @@ def render_sidebar() -> None:
 
         # Initialize theme in session state
         if 'theme' not in st.session_state:
-            st.session_state.theme = 'light'
+            st.session_state.theme = 'dark'
 
         theme = st.radio(
             "Theme",
-            options=["Light (Parchment)", "Dark"],
+            options=["Light", "Dark"],
             key="theme_selection",
-            index=0 if st.session_state.theme == 'light' else 1,
+            index=1 if st.session_state.theme == 'dark' else 0,
             label_visibility="collapsed"
         )
 

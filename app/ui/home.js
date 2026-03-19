@@ -42,9 +42,9 @@
                 const label = radio.closest('label');
                 if (label && label.textContent) {
                     const text = label.textContent.trim();
-                    if (text.includes('Dark')) {
+                    if (text.trim() === 'Dark') {
                         userTheme = 'dark';
-                    } else if (text.includes('Light')) {
+                    } else if (text.trim() === 'Light') {
                         userTheme = 'light';
                     }
                 }
@@ -192,26 +192,26 @@
                 left: 0;
                 right: 0;
                 height: 44px;
-                background: var(--surface-header, #f1e9dc);
-                border-top: 1px solid var(--divider, rgba(75, 46, 5, 0.2));
+                background: var(--bg-sidebar, #0f0f10);
+                border-top: 1px solid var(--border, rgba(255,255,255,0.07));
                 display: none;
                 align-items: center;
                 justify-content: flex-end;
                 padding: 0 1rem;
                 z-index: 16;
-                box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.08);
+                box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.3);
             `;
 
             const doneBtn = dismissBar.querySelector('#tcp-done-btn');
             doneBtn.style.cssText = `
                 background: transparent;
                 border: none;
-                color: var(--accent, #4b2e05);
+                color: var(--accent, #c9a84c);
                 font-weight: 600;
                 font-size: 1rem;
                 padding: 0.5rem 1rem;
                 cursor: pointer;
-                font-family: var(--font-ui, sans-serif);
+                font-family: var(--font-body, sans-serif);
             `;
             doneBtn.addEventListener('click', blurActiveInput);
 

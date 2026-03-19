@@ -1,161 +1,193 @@
 /* ============================================================
-   The Christian Project — Sacred Manuscript UI
-   Single source of truth. One palette. No conflicts.
+   The Christian Project — AI-Grade Dark UI
+   Design language: Linear / Vercel / Claude
    ============================================================ */
 
-/* --- Google Fonts --- */
-@import url('https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;1,400&family=Inter:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Lora:ital,wght@0,400;0,500;0,600;1,400&display=swap');
 
-/* --- Design Tokens --- */
+/* ============================================================
+   DESIGN TOKENS
+   ============================================================ */
+
 body {
-    --bg:              #faf6ef;
-    --bg-sidebar:      #f2ece0;
-    --bg-card:         #ffffff;
-    --bg-elevated:     #f7f2e8;
-    --bg-input:        #fdfaf4;
+    /* Core surfaces */
+    --bg:              #0a0a0b;
+    --bg-sidebar:      #0f0f10;
+    --bg-card:         #111113;
+    --bg-elevated:     #161618;
+    --bg-input:        #111113;
+    --bg-hover:        rgba(255,255,255,0.04);
 
-    --text:            #1a1007;
-    --text-secondary:  #5a4a35;
-    --text-muted:      #8a7660;
+    /* Text */
+    --text:            #e8e8ed;
+    --text-secondary:  #a0a0ab;
+    --text-muted:      #606068;
 
-    --accent:          #2d1a0a;
-    --accent-mid:      #5c3317;
-    --accent-light:    rgba(45, 26, 10, 0.08);
-    --accent-hover:    #3f2510;
+    /* Accent — a refined gold/amber for Christian context */
+    --accent:          #c9a84c;
+    --accent-hover:    #d4b563;
+    --accent-dim:      rgba(201, 168, 76, 0.12);
+    --accent-glow:     rgba(201, 168, 76, 0.18);
 
-    --gold:            #b8892a;
-    --gold-soft:       rgba(184, 137, 42, 0.15);
+    /* Borders & dividers */
+    --border:          rgba(255,255,255,0.07);
+    --border-strong:   rgba(255,255,255,0.12);
+    --divider:         rgba(255,255,255,0.06);
 
-    --user-bubble:     #ede5d4;
-    --user-border:     rgba(45, 26, 10, 0.18);
-    --asst-bubble:     #ffffff;
-    --asst-border:     rgba(45, 26, 10, 0.08);
+    /* User / assistant message bubbles */
+    --user-bubble:     rgba(201, 168, 76, 0.08);
+    --user-border:     rgba(201, 168, 76, 0.20);
+    --asst-bubble:     #111113;
+    --asst-border:     rgba(255,255,255,0.07);
 
-    --divider:         rgba(45, 26, 10, 0.10);
-    --shadow-sm:       0 1px 4px rgba(45, 26, 10, 0.08);
-    --shadow-md:       0 4px 16px rgba(45, 26, 10, 0.10);
-    --shadow-lg:       0 8px 32px rgba(45, 26, 10, 0.12);
-    --shadow-input:    0 -4px 24px rgba(45, 26, 10, 0.08);
+    /* Shadows */
+    --shadow-sm:       0 1px 3px rgba(0,0,0,0.4);
+    --shadow-md:       0 4px 16px rgba(0,0,0,0.5);
+    --shadow-lg:       0 8px 40px rgba(0,0,0,0.6);
+    --shadow-input:    0 0 0 1px rgba(201,168,76,0.25), 0 4px 24px rgba(0,0,0,0.5);
 
+    /* Radii */
+    --radius-xs:       4px;
     --radius-sm:       8px;
-    --radius-md:       14px;
-    --radius-lg:       20px;
-    --radius-xl:       28px;
+    --radius-md:       12px;
+    --radius-lg:       16px;
+    --radius-xl:       24px;
 
-    --font-body:       'Lora', Georgia, serif;
-    --font-ui:         'Inter', 'Segoe UI', sans-serif;
+    /* Typography */
+    --font-body:       'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --font-serif:      'Lora', Georgia, serif;
 
-    --focus:           2px solid #b8892a;
-    --focus-offset:    2px;
-
-    color-scheme: light;
-}
-
-body[data-theme="dark"],
-body.dark-mode {
-    --bg:              #0e0b07;
-    --bg-sidebar:      #161009;
-    --bg-card:         #1c1710;
-    --bg-elevated:     #231b11;
-    --bg-input:        #1a1409;
-
-    --text:            #f0e8d8;
-    --text-secondary:  #c8b898;
-    --text-muted:      #8a7a62;
-
-    --accent:          #d4a040;
-    --accent-mid:      #c49030;
-    --accent-light:    rgba(212, 160, 64, 0.12);
-    --accent-hover:    #e0b050;
-
-    --gold:            #d4a040;
-    --gold-soft:       rgba(212, 160, 64, 0.12);
-
-    --user-bubble:     #2a2016;
-    --user-border:     rgba(212, 160, 64, 0.20);
-    --asst-bubble:     #1c1710;
-    --asst-border:     rgba(212, 160, 64, 0.10);
-
-    --divider:         rgba(212, 160, 64, 0.12);
-    --shadow-sm:       0 1px 4px rgba(0, 0, 0, 0.30);
-    --shadow-md:       0 4px 16px rgba(0, 0, 0, 0.40);
-    --shadow-lg:       0 8px 32px rgba(0, 0, 0, 0.50);
-    --shadow-input:    0 -4px 24px rgba(0, 0, 0, 0.40);
+    /* Focus */
+    --focus:           0 0 0 2px rgba(201,168,76,0.5);
 
     color-scheme: dark;
 }
 
-@media (prefers-color-scheme: dark) {
-    body:not([data-theme]):not(.light-mode) {
-        --bg:              #0e0b07;
-        --bg-sidebar:      #161009;
-        --bg-card:         #1c1710;
-        --bg-elevated:     #231b11;
-        --bg-input:        #1a1409;
-        --text:            #f0e8d8;
-        --text-secondary:  #c8b898;
-        --text-muted:      #8a7a62;
-        --accent:          #d4a040;
-        --accent-mid:      #c49030;
-        --accent-light:    rgba(212, 160, 64, 0.12);
-        --accent-hover:    #e0b050;
-        --gold:            #d4a040;
-        --gold-soft:       rgba(212, 160, 64, 0.12);
-        --user-bubble:     #2a2016;
-        --user-border:     rgba(212, 160, 64, 0.20);
-        --asst-bubble:     #1c1710;
-        --asst-border:     rgba(212, 160, 64, 0.10);
-        --divider:         rgba(212, 160, 64, 0.12);
-        --shadow-sm:       0 1px 4px rgba(0, 0, 0, 0.30);
-        --shadow-md:       0 4px 16px rgba(0, 0, 0, 0.40);
-        --shadow-lg:       0 8px 32px rgba(0, 0, 0, 0.50);
-        --shadow-input:    0 -4px 24px rgba(0, 0, 0, 0.40);
-        color-scheme: dark;
+/* Light mode — warm parchment variant */
+body[data-theme="light"],
+body.light-mode {
+    --bg:              #faf8f4;
+    --bg-sidebar:      #f3efe7;
+    --bg-card:         #ffffff;
+    --bg-elevated:     #f7f4ee;
+    --bg-input:        #ffffff;
+    --bg-hover:        rgba(0,0,0,0.03);
+
+    --text:            #1a1814;
+    --text-secondary:  #5a5248;
+    --text-muted:      #9a9088;
+
+    --accent:          #8b5e1a;
+    --accent-hover:    #7a5018;
+    --accent-dim:      rgba(139,94,26,0.08);
+    --accent-glow:     rgba(139,94,26,0.12);
+
+    --border:          rgba(0,0,0,0.08);
+    --border-strong:   rgba(0,0,0,0.14);
+    --divider:         rgba(0,0,0,0.06);
+
+    --user-bubble:     #f0e8d8;
+    --user-border:     rgba(139,94,26,0.18);
+    --asst-bubble:     #ffffff;
+    --asst-border:     rgba(0,0,0,0.07);
+
+    --shadow-sm:       0 1px 3px rgba(0,0,0,0.08);
+    --shadow-md:       0 4px 16px rgba(0,0,0,0.10);
+    --shadow-lg:       0 8px 40px rgba(0,0,0,0.12);
+    --shadow-input:    0 0 0 1px rgba(139,94,26,0.2), 0 4px 16px rgba(0,0,0,0.08);
+
+    --focus:           0 0 0 2px rgba(139,94,26,0.35);
+
+    color-scheme: light;
+}
+
+@media (prefers-color-scheme: light) {
+    body:not([data-theme]):not(.dark-mode) {
+        --bg:              #faf8f4;
+        --bg-sidebar:      #f3efe7;
+        --bg-card:         #ffffff;
+        --bg-elevated:     #f7f4ee;
+        --bg-input:        #ffffff;
+        --bg-hover:        rgba(0,0,0,0.03);
+        --text:            #1a1814;
+        --text-secondary:  #5a5248;
+        --text-muted:      #9a9088;
+        --accent:          #8b5e1a;
+        --accent-hover:    #7a5018;
+        --accent-dim:      rgba(139,94,26,0.08);
+        --accent-glow:     rgba(139,94,26,0.12);
+        --border:          rgba(0,0,0,0.08);
+        --border-strong:   rgba(0,0,0,0.14);
+        --divider:         rgba(0,0,0,0.06);
+        --user-bubble:     #f0e8d8;
+        --user-border:     rgba(139,94,26,0.18);
+        --asst-bubble:     #ffffff;
+        --asst-border:     rgba(0,0,0,0.07);
+        --shadow-sm:       0 1px 3px rgba(0,0,0,0.08);
+        --shadow-md:       0 4px 16px rgba(0,0,0,0.10);
+        --shadow-lg:       0 8px 40px rgba(0,0,0,0.12);
+        --shadow-input:    0 0 0 1px rgba(139,94,26,0.2), 0 4px 16px rgba(0,0,0,0.08);
+        --focus:           0 0 0 2px rgba(139,94,26,0.35);
+        color-scheme: light;
     }
 }
 
-/* --- Reset --- */
+/* ============================================================
+   RESET & BASE
+   ============================================================ */
+
 *, *::before, *::after {
     box-sizing: border-box;
 }
 
-/* --- Base --- */
 html, body, .stApp {
     background: var(--bg) !important;
     color: var(--text);
     font-family: var(--font-body);
-    font-size: 16px;
-    line-height: 1.7;
+    font-size: 15px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
 }
 
-/* Prevent iOS zoom on input focus */
+/* Prevent iOS zoom */
 input, textarea, select, button {
     font-size: 16px !important;
 }
 
-/* Prevent horizontal scroll */
 .stApp { overflow-x: hidden; }
 
 /* Touch targets */
-button, [role="button"] { min-height: 44px; min-width: 44px; }
+button, [role="button"] { min-height: 36px; }
 
-/* --- Main content area --- */
+/* ============================================================
+   HIDE STREAMLIT CHROME
+   ============================================================ */
+
+#MainMenu,
+footer,
+header,
+[data-testid="stToolbar"],
+[data-testid="stDecoration"],
+[data-testid="stStatusWidget"] {
+    display: none !important;
+}
+
+/* ============================================================
+   MAIN CONTENT AREA
+   ============================================================ */
+
 main .block-container {
-    max-width: 780px !important;
-    padding: 2rem 1.75rem 7rem !important;
+    max-width: 760px !important;
+    padding: 2rem 1.5rem 8rem !important;
     margin: 0 auto !important;
 }
 
 @media (max-width: 768px) {
     main .block-container {
-        padding: 1.25rem 1rem 6rem !important;
+        padding: 1.25rem 1rem 7rem !important;
     }
 }
-
-/* --- Hide Streamlit chrome --- */
-#MainMenu, footer, header { display: none !important; }
-[data-testid="stToolbar"] { display: none !important; }
-[data-testid="stDecoration"] { display: none !important; }
 
 /* ============================================================
    SIDEBAR
@@ -163,40 +195,34 @@ main .block-container {
 
 section[data-testid="stSidebar"] {
     background: var(--bg-sidebar) !important;
-    border-right: 1px solid var(--divider) !important;
+    border-right: 1px solid var(--border) !important;
 }
 
 section[data-testid="stSidebar"] > div:first-child {
-    padding: 2rem 1.5rem 3rem !important;
+    padding: 1.75rem 1.25rem 2.5rem !important;
 }
 
-/* Sidebar brand */
+/* Brand lockup */
 .sidebar-brand {
     display: flex;
     align-items: center;
     gap: 0.75rem;
-    padding-bottom: 1.5rem;
+    padding-bottom: 1.25rem;
     border-bottom: 1px solid var(--divider);
-    margin-bottom: 1.5rem;
+    margin-bottom: 1.25rem;
 }
 
 .sidebar-cross {
-    width: 2.5rem;
-    height: 2.5rem;
+    width: 2rem;
+    height: 2rem;
     display: grid;
     place-items: center;
-    background: var(--accent);
+    background: var(--accent-dim);
+    border: 1px solid var(--accent-glow);
     border-radius: var(--radius-sm);
-    color: #faf6ef;
-    font-size: 1.1rem;
+    color: var(--accent);
+    font-size: 0.9rem;
     flex-shrink: 0;
-    box-shadow: var(--shadow-sm);
-}
-
-body[data-theme="dark"] .sidebar-cross,
-body.dark-mode .sidebar-cross {
-    background: var(--gold);
-    color: #0e0b07;
 }
 
 .sidebar-brand-text {
@@ -207,102 +233,105 @@ body.dark-mode .sidebar-cross {
 
 .sidebar-brand-name {
     font-family: var(--font-body);
-    font-size: 1rem;
+    font-size: 0.875rem;
     font-weight: 600;
     color: var(--text);
     line-height: 1.3;
+    letter-spacing: -0.01em;
 }
 
 .sidebar-brand-subtitle {
-    font-family: var(--font-ui);
-    font-size: 0.75rem;
+    font-family: var(--font-body);
+    font-size: 0.72rem;
     color: var(--text-muted);
     line-height: 1.3;
 }
 
-/* Sidebar section labels */
+/* Section labels */
 .sidebar-section-title {
-    font-family: var(--font-ui);
-    font-size: 0.68rem;
-    letter-spacing: 0.14em;
+    font-family: var(--font-body);
+    font-size: 0.65rem;
+    letter-spacing: 0.1em;
     text-transform: uppercase;
     color: var(--text-muted);
-    margin: 1.75rem 0 0.6rem;
+    margin: 1.5rem 0 0.5rem;
+    font-weight: 500;
 }
 
-/* Sidebar primary button (New Chat) */
+/* Primary button (New Chat) */
 section[data-testid="stSidebar"] [data-testid="baseButton-primary"] {
-    background: var(--accent) !important;
-    color: #faf6ef !important;
-    border: none !important;
+    background: var(--accent-dim) !important;
+    color: var(--accent) !important;
+    border: 1px solid var(--accent-glow) !important;
     border-radius: var(--radius-md) !important;
-    font-family: var(--font-ui) !important;
-    font-size: 0.875rem !important;
+    font-family: var(--font-body) !important;
+    font-size: 0.8rem !important;
     font-weight: 600 !important;
-    padding: 0.65rem 1rem !important;
-    box-shadow: var(--shadow-sm) !important;
-    transition: background 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease !important;
+    padding: 0.55rem 1rem !important;
+    box-shadow: none !important;
+    transition: background 0.15s ease, border-color 0.15s ease !important;
     width: 100% !important;
+    letter-spacing: 0.01em !important;
 }
 
 section[data-testid="stSidebar"] [data-testid="baseButton-primary"]:hover {
-    background: var(--accent-hover) !important;
-    transform: translateY(-1px) !important;
-    box-shadow: var(--shadow-md) !important;
+    background: rgba(201,168,76,0.16) !important;
+    border-color: rgba(201,168,76,0.35) !important;
 }
 
-body[data-theme="dark"] section[data-testid="stSidebar"] [data-testid="baseButton-primary"],
-body.dark-mode section[data-testid="stSidebar"] [data-testid="baseButton-primary"] {
-    background: var(--gold) !important;
-    color: #0e0b07 !important;
+body[data-theme="light"] section[data-testid="stSidebar"] [data-testid="baseButton-primary"],
+body.light-mode section[data-testid="stSidebar"] [data-testid="baseButton-primary"] {
+    background: var(--accent-dim) !important;
+    color: var(--accent) !important;
+    border-color: var(--accent-glow) !important;
 }
 
-/* Sidebar secondary buttons */
+/* Secondary buttons in sidebar */
 section[data-testid="stSidebar"] [data-testid="baseButton-secondary"] {
     background: transparent !important;
     color: var(--text-secondary) !important;
-    border: 1px solid var(--divider) !important;
+    border: 1px solid var(--border) !important;
     border-radius: var(--radius-sm) !important;
-    font-family: var(--font-ui) !important;
-    font-size: 0.82rem !important;
-    padding: 0.5rem 0.75rem !important;
-    transition: background 0.15s ease, border-color 0.15s ease !important;
+    font-family: var(--font-body) !important;
+    font-size: 0.78rem !important;
+    padding: 0.45rem 0.75rem !important;
+    transition: background 0.12s ease, border-color 0.12s ease !important;
     justify-content: flex-start !important;
     text-align: left !important;
 }
 
 section[data-testid="stSidebar"] [data-testid="baseButton-secondary"]:hover {
-    background: var(--accent-light) !important;
-    border-color: var(--accent) !important;
+    background: var(--bg-hover) !important;
+    border-color: var(--border-strong) !important;
     color: var(--text) !important;
 }
 
 /* Sidebar caption */
 section[data-testid="stSidebar"] .stCaption {
-    font-family: var(--font-ui);
-    font-size: 0.78rem;
+    font-family: var(--font-body);
+    font-size: 0.72rem;
     color: var(--text-muted);
 }
 
-/* Sidebar radio (theme toggle) */
+/* Sidebar radio */
 section[data-testid="stSidebar"] [data-testid="stRadio"] label {
-    font-family: var(--font-ui) !important;
-    font-size: 0.875rem !important;
+    font-family: var(--font-body) !important;
+    font-size: 0.82rem !important;
     color: var(--text-secondary) !important;
 }
 
 /* Sidebar expander */
 section[data-testid="stSidebar"] .streamlit-expanderHeader {
-    font-family: var(--font-ui) !important;
-    font-size: 0.875rem !important;
+    font-family: var(--font-body) !important;
+    font-size: 0.82rem !important;
     color: var(--text-secondary) !important;
 }
 
 section[data-testid="stSidebar"] .streamlit-expanderContent p {
-    font-family: var(--font-ui);
-    font-size: 0.825rem;
+    font-family: var(--font-body);
+    font-size: 0.78rem;
     color: var(--text-muted);
-    line-height: 1.6;
+    line-height: 1.65;
 }
 
 /* ============================================================
@@ -311,155 +340,156 @@ section[data-testid="stSidebar"] .streamlit-expanderContent p {
 
 .chat-header {
     text-align: center;
-    padding: 2rem 0 1.5rem;
+    padding: 2.5rem 0 2rem;
     border-bottom: 1px solid var(--divider);
-    margin-bottom: 1.75rem;
+    margin-bottom: 2rem;
 }
 
 .chat-header-identity {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 0.5rem;
+    gap: 0.75rem;
 }
 
 .chat-header-cross {
-    font-size: 1.5rem;
-    color: var(--gold);
+    font-size: 1.25rem;
+    color: var(--accent);
     line-height: 1;
-    margin-bottom: 0.25rem;
+    opacity: 0.85;
 }
 
 .chat-title-group {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 0.25rem;
+    gap: 0.35rem;
 }
 
 .chat-title-group h1 {
     font-family: var(--font-body) !important;
-    font-size: 1.65rem !important;
+    font-size: 1.35rem !important;
     font-weight: 600 !important;
     color: var(--text) !important;
     margin: 0 !important;
     line-height: 1.2 !important;
-    letter-spacing: -0.01em !important;
+    letter-spacing: -0.02em !important;
 }
 
 .chat-title-group p {
-    font-family: var(--font-ui);
-    font-size: 0.875rem;
+    font-family: var(--font-body);
+    font-size: 0.82rem;
     color: var(--text-muted);
     margin: 0;
-    font-style: italic;
+    font-style: normal;
+    font-weight: 400;
 }
 
-/* Hide duplicate headers on rerun */
 .chat-header ~ .chat-header { display: none !important; }
 
 /* ============================================================
    CHAT MESSAGES
    ============================================================ */
 
-/* Strip Streamlit's default message chrome */
 .stChatMessage {
     background: transparent !important;
     border: none !important;
     padding: 0 !important;
-    margin-bottom: 1rem !important;
+    margin-bottom: 0.75rem !important;
 }
 
-/* Hide avatar icons — we don't need them */
+/* Hide default avatars */
 .stChatMessage [data-testid="chatAvatarIcon-user"],
 .stChatMessage [data-testid="chatAvatarIcon-assistant"] {
     display: none !important;
 }
 
-/* Assistant messages — clean white card */
+/* Assistant bubble */
 .stChatMessage[data-testid="stChatMessage-assistant"] > div,
 .stChatMessage[data-testid="stChatMessage-Assistant"] > div {
     background: var(--asst-bubble) !important;
     border: 1px solid var(--asst-border) !important;
     border-radius: var(--radius-lg) !important;
-    padding: 1.1rem 1.4rem !important;
-    box-shadow: var(--shadow-md) !important;
-    max-width: 88% !important;
-    animation: msgIn 0.2s ease-out both;
+    padding: 1rem 1.25rem !important;
+    box-shadow: var(--shadow-sm) !important;
+    max-width: 86% !important;
+    animation: msgIn 0.18s ease-out both;
 }
 
-/* User messages — warm sand, right-aligned */
+/* User bubble */
 .stChatMessage[data-testid="stChatMessage-user"] > div,
 .stChatMessage[data-testid="stChatMessage-User"] > div {
     background: var(--user-bubble) !important;
     border: 1px solid var(--user-border) !important;
     border-radius: var(--radius-lg) !important;
-    padding: 0.9rem 1.25rem !important;
-    box-shadow: var(--shadow-sm) !important;
-    max-width: 75% !important;
+    padding: 0.85rem 1.1rem !important;
+    box-shadow: none !important;
+    max-width: 72% !important;
     margin-left: auto !important;
-    animation: msgIn 0.2s ease-out both;
+    animation: msgIn 0.18s ease-out both;
 }
 
 /* Message text */
 .stChatMessage .stMarkdown p {
     font-family: var(--font-body) !important;
-    font-size: 1rem !important;
-    line-height: 1.75 !important;
+    font-size: 0.9375rem !important;
+    line-height: 1.7 !important;
     color: var(--text) !important;
-    margin: 0 0 0.75rem !important;
+    margin: 0 0 0.65rem !important;
 }
 
 .stChatMessage .stMarkdown p:last-child {
     margin-bottom: 0 !important;
 }
 
-/* Source expander */
+/* Source expanders inside messages */
 .stChatMessage .stExpander {
     margin-top: 0.75rem !important;
-    border: 1px solid var(--divider) !important;
+    border: 1px solid var(--border) !important;
     border-radius: var(--radius-sm) !important;
     background: var(--bg-elevated) !important;
 }
 
 .stChatMessage .streamlit-expanderHeader {
-    font-family: var(--font-ui) !important;
-    font-size: 0.78rem !important;
+    font-family: var(--font-body) !important;
+    font-size: 0.75rem !important;
     color: var(--text-muted) !important;
     font-weight: 500 !important;
     padding: 0.5rem 0.75rem !important;
 }
 
 .stChatMessage .streamlit-expanderContent {
-    font-family: var(--font-ui);
-    font-size: 0.82rem;
+    font-family: var(--font-body);
+    font-size: 0.8rem;
     color: var(--text-secondary);
     padding: 0.25rem 0.75rem 0.75rem !important;
 }
 
 /* Feedback row */
 .feedback-wrapper p {
-    font-family: var(--font-ui) !important;
-    font-size: 0.78rem !important;
+    font-family: var(--font-body) !important;
+    font-size: 0.72rem !important;
     color: var(--text-muted) !important;
-    margin: 0.75rem 0 0.4rem !important;
+    margin: 0.6rem 0 0.35rem !important;
+    letter-spacing: 0.02em !important;
 }
 
+/* Feedback buttons (thumbs) */
 .stChatMessage [data-testid="baseButton-secondary"] {
     background: transparent !important;
-    border: 1px solid var(--divider) !important;
+    border: 1px solid var(--border) !important;
     border-radius: 999px !important;
     color: var(--text-muted) !important;
-    font-family: var(--font-ui) !important;
-    font-size: 0.78rem !important;
-    padding: 0.3rem 0.9rem !important;
-    min-height: 32px !important;
-    transition: background 0.15s, border-color 0.15s, color 0.15s !important;
+    font-family: var(--font-body) !important;
+    font-size: 0.75rem !important;
+    padding: 0.25rem 0.75rem !important;
+    min-height: 28px !important;
+    transition: background 0.12s, border-color 0.12s, color 0.12s !important;
 }
 
 .stChatMessage [data-testid="baseButton-secondary"]:hover {
-    background: var(--accent-light) !important;
-    border-color: var(--accent) !important;
+    background: var(--bg-hover) !important;
+    border-color: var(--border-strong) !important;
     color: var(--text) !important;
 }
 
@@ -468,55 +498,67 @@ section[data-testid="stSidebar"] .streamlit-expanderContent p {
    ============================================================ */
 
 [data-testid="stChatInput"] {
-    background: var(--bg-card) !important;
-    border: 1px solid var(--divider) !important;
+    background: var(--bg-input) !important;
+    border: 1px solid var(--border-strong) !important;
     border-radius: var(--radius-xl) !important;
+    box-shadow: var(--shadow-md) !important;
+    padding: 0.65rem 0.85rem !important;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease !important;
+}
+
+[data-testid="stChatInput"]:focus-within {
+    border-color: rgba(201,168,76,0.4) !important;
     box-shadow: var(--shadow-input) !important;
-    padding: 0.75rem 1rem !important;
+}
+
+body[data-theme="light"] [data-testid="stChatInput"]:focus-within,
+body.light-mode [data-testid="stChatInput"]:focus-within {
+    border-color: rgba(139,94,26,0.3) !important;
 }
 
 [data-testid="stChatInput"] textarea {
     background: transparent !important;
     border: none !important;
     font-family: var(--font-body) !important;
-    font-size: 1rem !important;
+    font-size: 0.9375rem !important;
     color: var(--text) !important;
-    line-height: 1.6 !important;
+    line-height: 1.55 !important;
     resize: none !important;
     box-shadow: none !important;
     outline: none !important;
-    padding: 0.4rem 0 !important;
+    padding: 0.3rem 0 !important;
 }
 
 [data-testid="stChatInput"] textarea::placeholder {
     color: var(--text-muted) !important;
-    font-style: italic !important;
+    font-style: normal !important;
     font-family: var(--font-body) !important;
 }
 
+/* Send button */
 [data-testid="stChatInput"] [data-testid="baseButton-secondary"] {
     background: var(--accent) !important;
-    color: #faf6ef !important;
+    color: #0a0a0b !important;
     border: none !important;
     border-radius: var(--radius-md) !important;
-    font-family: var(--font-ui) !important;
+    font-family: var(--font-body) !important;
     font-weight: 600 !important;
-    font-size: 0.875rem !important;
-    padding: 0.5rem 1.25rem !important;
-    min-height: 40px !important;
-    box-shadow: var(--shadow-sm) !important;
-    transition: background 0.15s ease, transform 0.15s ease !important;
+    font-size: 0.8rem !important;
+    padding: 0.45rem 1rem !important;
+    min-height: 36px !important;
+    box-shadow: none !important;
+    transition: background 0.12s ease, opacity 0.12s ease !important;
+    letter-spacing: 0.01em !important;
 }
 
 [data-testid="stChatInput"] [data-testid="baseButton-secondary"]:hover {
     background: var(--accent-hover) !important;
-    transform: translateY(-1px) !important;
+    opacity: 1 !important;
 }
 
-body[data-theme="dark"] [data-testid="stChatInput"] [data-testid="baseButton-secondary"],
-body.dark-mode [data-testid="stChatInput"] [data-testid="baseButton-secondary"] {
-    background: var(--gold) !important;
-    color: #0e0b07 !important;
+body[data-theme="light"] [data-testid="stChatInput"] [data-testid="baseButton-secondary"],
+body.light-mode [data-testid="stChatInput"] [data-testid="baseButton-secondary"] {
+    color: #ffffff !important;
 }
 
 /* Fixed on mobile */
@@ -535,30 +577,29 @@ body.dark-mode [data-testid="stChatInput"] [data-testid="baseButton-secondary"] 
    ============================================================ */
 
 .doctrinal-footer {
-    margin-top: 2rem;
+    margin-top: 2.5rem;
     padding-top: 1.25rem;
     border-top: 1px solid var(--divider);
-    font-family: var(--font-ui);
-    font-size: 0.78rem;
+    font-family: var(--font-body);
+    font-size: 0.72rem;
     color: var(--text-muted);
     text-align: center;
-    font-style: italic;
-    line-height: 1.6;
+    line-height: 1.65;
+    letter-spacing: 0.01em;
 }
 
-/* Hide duplicates */
 .doctrinal-footer ~ .doctrinal-footer { display: none !important; }
 
 /* ============================================================
-   TRUST PANEL — shown as a subtle callout on first load
+   TRUST PANEL
    ============================================================ */
 
 .trust-panel {
-    display: none; /* hidden by default, shown via JS after first message */
+    display: none;
 }
 
 /* ============================================================
-   STREAMLIT MARKDOWN OVERRIDES
+   STREAMLIT OVERRIDES
    ============================================================ */
 
 [data-testid="stMarkdownContainer"] p {
@@ -573,26 +614,73 @@ body.dark-mode [data-testid="stChatInput"] [data-testid="baseButton-secondary"] 
     font-family: var(--font-body);
     color: var(--text);
     font-weight: 600;
+    letter-spacing: -0.01em;
 }
 
-/* Caption text */
 .stCaption, small, .stChatMessage .stCaption {
-    font-family: var(--font-ui) !important;
-    font-size: 0.78rem !important;
+    font-family: var(--font-body) !important;
+    font-size: 0.72rem !important;
     color: var(--text-muted) !important;
 }
 
-/* Info / warning boxes */
 [data-testid="stAlert"] {
+    background: var(--bg-elevated) !important;
+    border: 1px solid var(--border) !important;
     border-radius: var(--radius-md) !important;
-    border: 1px solid var(--divider) !important;
-    font-family: var(--font-ui) !important;
-    font-size: 0.875rem !important;
+    font-family: var(--font-body) !important;
+    font-size: 0.85rem !important;
+    color: var(--text-secondary) !important;
 }
 
-/* Spinner */
 [data-testid="stSpinner"] {
     color: var(--text-muted) !important;
+}
+
+/* General inputs */
+input,
+textarea,
+select,
+.stTextInput input,
+.stTextArea textarea {
+    background: var(--bg-input) !important;
+    color: var(--text) !important;
+    border: 1px solid var(--border-strong) !important;
+    border-radius: var(--radius-md) !important;
+    font-family: var(--font-body) !important;
+    font-size: 0.9rem !important;
+}
+
+/* ============================================================
+   SEND BUTTON LABEL
+   ============================================================ */
+
+.send-button-label {
+    font-family: var(--font-body);
+    font-weight: 600;
+    font-size: 0.8rem;
+    letter-spacing: 0.01em;
+}
+
+/* ============================================================
+   SKIP LINK ACCESSIBILITY
+   ============================================================ */
+
+.skip-link {
+    position: absolute;
+    top: -9999px;
+    left: 0;
+    background: var(--accent);
+    color: #0a0a0b;
+    padding: 0.5rem 1rem;
+    font-family: var(--font-body);
+    font-size: 0.875rem;
+    font-weight: 600;
+    z-index: 9999;
+    border-radius: 0 0 var(--radius-sm) 0;
+}
+
+.skip-link:focus {
+    top: 0;
 }
 
 /* ============================================================
@@ -603,8 +691,8 @@ button:focus-visible,
 input:focus-visible,
 textarea:focus-visible,
 [role="button"]:focus-visible {
-    outline: var(--focus) !important;
-    outline-offset: var(--focus-offset) !important;
+    outline: none !important;
+    box-shadow: var(--focus) !important;
 }
 
 .sr-only {
@@ -622,7 +710,7 @@ textarea:focus-visible,
    ============================================================ */
 
 @keyframes msgIn {
-    from { opacity: 0; transform: translateY(6px); }
+    from { opacity: 0; transform: translateY(5px); }
     to   { opacity: 1; transform: translateY(0); }
 }
 
@@ -637,12 +725,27 @@ textarea:focus-visible,
    SCROLLBAR
    ============================================================ */
 
-::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar { width: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
-    background: var(--divider);
+    background: var(--border-strong);
     border-radius: 999px;
 }
 ::-webkit-scrollbar-thumb:hover {
     background: var(--text-muted);
+}
+
+/* ============================================================
+   MOBILE KEYBOARD DISMISS BAR
+   ============================================================ */
+
+#tcp-keyboard-dismiss-bar {
+    background: var(--bg-sidebar) !important;
+    border-top: 1px solid var(--border) !important;
+}
+
+#tcp-done-btn {
+    color: var(--accent) !important;
+    font-family: var(--font-body) !important;
+    font-weight: 600 !important;
 }

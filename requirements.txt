@@ -1,6 +1,5 @@
 # Core dependencies - install first
 numpy==1.26.4
-Cython
 
 # NLP and ML - Use spacy 3.7.x for numpy 1.26.4 compatibility
 spacy==3.7.6
@@ -25,5 +24,5 @@ python-dotenv
 pydantic
 pydantic-settings
 
-# Testing
-pytest
+# Testing (local only, not installed in Docker)
+# pytest

@@ -26,6 +26,7 @@ SOURCE_DATASETS: List[Tuple[str, Path]] = [
     ("doctrine", Path("data/processed/wels_doctrine.jsonl")),
     ("pastoral_teaching", Path("data/processed/pastoral_teachings.jsonl")),
     ("devotion", Path("data/cleaned/devotions_family_cleaned.jsonl")),
+    ("web_article", Path("data/processed/rss_content.jsonl")),
 ]
 # Configure local cache paths (works offline if models already downloaded).
 CACHE_ROOT = Path("data/cache")

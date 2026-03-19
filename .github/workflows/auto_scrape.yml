@@ -1,0 +1,50 @@
+name: Auto-Scrape RSS & Rebuild Embeddings
+
+on:
+  schedule:
+    - cron: '0 4 * * 1'   # Every Monday 4am UTC — zero cost, zero maintenance
+  workflow_dispatch:        # Manual trigger available any time in GitHub UI
+
+jobs:
+  scrape-and-embed:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install CPU-only PyTorch first (avoids CUDA ~2GB pull)
+        run: pip install --upgrade pip && pip install torch --index-url https://download.pytorch.org/whl/cpu
+
+      - name: Install project dependencies
+        run: pip install feedparser requests beautifulsoup4 sentence-transformers faiss-cpu numpy pyyaml
+
+      - name: Scrape RSS sources
+        run: python scripts/scrape_rss.py
+
+      - name: Rebuild FAISS embeddings
+        env:
+          # Allow model download from HuggingFace in CI
+          TRANSFORMERS_OFFLINE: "0"
+          HF_HUB_OFFLINE: "0"
+        run: python scripts/embed_dataset.py
+
+      - name: Commit updated data back to repo
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add \
+            data/processed/rss_content.jsonl \
+            data/processed/rss_seen_urls.json \
+            data/processed/wels_embeddings/
+          git diff --staged --quiet && echo "No new data." || \
+            git commit -m "chore: weekly RSS scrape + embedding rebuild [skip ci]" && git push

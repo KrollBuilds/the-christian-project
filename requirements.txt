@@ -16,6 +16,7 @@ uvicorn[standard]
 pandas
 PyYAML
 beautifulsoup4
+feedparser
 requests
 
 # OpenAI and config

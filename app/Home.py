@@ -285,14 +285,6 @@ def _get_setting(*keys: str) -> Optional[str]:
 
 # ---------------------------------------------------------------------------
 # Preflight environment validation for Railway deployments
-required_vars = ["OPENAI_API_KEY"]
-missing_required = [var for var in required_vars if not os.getenv(var)]
-if missing_required:
-    st.error(
-        "Missing required environment variables."
-        f" Set the following in Railway: {', '.join(missing_required)}"
-    )
-    st.stop()
 
 # Configure logging early for deployment diagnostics
 logging.basicConfig(level=logging.INFO)
@@ -315,15 +307,13 @@ for path in DATA_PATHS:
 FEEDBACK_LOG_PATH = Path("data/metrics/feedback_log.jsonl")
 REVIEW_QUEUE_PATH = Path(os.getenv("REVIEW_QUEUE_PATH", "data/metrics/review_queue.jsonl"))
 
-# To set key locally: echo "OPENAI_API_KEY=yourkey" > .env
-# For deployment: add OPENAI_API_KEY as an environment variable in the hosting platform.
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-if not OPENAI_API_KEY:
-    st.error("OpenAI API key not found. Please set it in your environment or a .env file.")
-    st.stop()
+# Each user provides their own OpenAI API key via the sidebar.
+# No server-side key is used for public requests.
 
-client = OpenAI(api_key=OPENAI_API_KEY)
-# TODO: Secure key handling for multi-user hosting (user tokens vs global key).
+
+def _get_active_api_key() -> Optional[str]:
+    """Return the user-provided API key stored in their session."""
+    return st.session_state.get("user_api_key") or None
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
@@ -462,8 +452,13 @@ Instructions:
 
 Provide a thoughtful, scripturally-grounded response:"""
 
+    active_key = _get_active_api_key()
+    if not active_key:
+        st.error("Please enter your OpenAI API key in the sidebar to continue.")
+        return None
+    synthesis_client = OpenAI(api_key=active_key)
     try:
-        completion = client.chat.completions.create(
+        completion = synthesis_client.chat.completions.create(
             model=os.getenv("OPENAI_COMPLETIONS_MODEL", "gpt-4o-mini"),
             temperature=0.3,  # More consistent than 0.4
             max_tokens=800,   # More complete responses than default
@@ -621,6 +616,20 @@ def render_sidebar() -> None:
             st.rerun()
 
         st.caption("Conversation history coming soon.")
+
+        st.markdown("<div class='sidebar-section-title'>API Key</div>", unsafe_allow_html=True)
+        api_key_input = st.text_input(
+            "OpenAI API Key",
+            type="password",
+            placeholder="sk-...",
+            help="Your key is used only for this session and never stored.",
+            label_visibility="collapsed",
+        )
+        if api_key_input:
+            st.session_state["user_api_key"] = api_key_input
+            st.caption("Key active for this session.")
+        elif not st.session_state.get("user_api_key"):
+            st.caption("Enter your OpenAI API key above to get started.")
 
         st.markdown("<div class='sidebar-section-title'>About</div>", unsafe_allow_html=True)
         with st.expander("About This Tool", expanded=False):
@@ -1064,14 +1073,16 @@ def run_chat_interface() -> None:
         render_doctrinal_footer()
         st.markdown("</div>", unsafe_allow_html=True)
 
-    user_input = st.chat_input(
-        "Ask a theological question...", key="user_input"
-    )
-
-    if user_input:
-        process_input(user_input)
-        st.session_state.pop("user_input", None)
-        st.rerun()
+    if not st.session_state.get("user_api_key"):
+        st.info("Enter your OpenAI API key in the sidebar to start asking questions.")
+    else:
+        user_input = st.chat_input(
+            "Ask a theological question...", key="user_input"
+        )
+        if user_input:
+            process_input(user_input)
+            st.session_state.pop("user_input", None)
+            st.rerun()
 
 
 

@@ -2,6 +2,7 @@
 .env
 .env.*
 .env.local
+!.env.example
 
 # Python
 __pycache__/
@@ -22,6 +23,9 @@ env/
 data/cache/
 .pytest_cache/
 *.egg-info/
+
+# Claude Code
+.claude/
 
 # IDE
 .idea/

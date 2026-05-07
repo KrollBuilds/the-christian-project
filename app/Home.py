@@ -14,6 +14,7 @@ import json
 import logging
 import os
 import random
+import re
 import sys
 import textwrap
 from datetime import datetime, timezone
@@ -722,20 +723,28 @@ def _fallback_from_retrieval(
         message = "Faithful resources are still being gathered for this topic. Please check back soon."
         return append_pastoral_guidance(message)
 
-    lines: List[str] = ["Here are some related teachings:"]
-    for item in doctrine_sources:
-        lines.append(
-            f"- **{item.get('question', 'N/A')}** (score {item.get('score', 0):.2f})"
-        )
-    if contextual_sources:
-        lines.append("")
-        lines.append("Related WELS resources:")
-        for item in contextual_sources:
-            lines.append(
-                f"- **{item.get('title', 'N/A')}** (score {item.get('score', 0):.2f})"
-            )
-    compiled = "\n".join(lines).strip()
-    return append_pastoral_guidance(compiled)
+    best_source = (doctrine_sources or contextual_sources)[0]
+    question_text = str(best_source.get("question") or "").strip()
+    content_text = str(
+        best_source.get("answer")
+        or best_source.get("content")
+        or best_source.get("body")
+        or best_source.get("title")
+        or ""
+    )
+    content_text = re.sub(r"<[^>]+>", " ", content_text)
+    content_text = re.sub(r"\s+", " ", content_text).strip()
+
+    if not content_text:
+        message = "I found related material, but I cannot turn it into a reliable answer while the answer service is unavailable."
+        return append_pastoral_guidance(message)
+
+    content_text = textwrap.shorten(content_text, width=900, placeholder="...")
+    if question_text:
+        message = f"The closest vetted teaching I found asks, \"{question_text}\" It says: {content_text}"
+    else:
+        message = content_text
+    return append_pastoral_guidance(message)
 
 
 def handle_question(question: str) -> Dict[str, Any]:
@@ -771,9 +780,7 @@ def handle_question(question: str) -> Dict[str, Any]:
 
         if answer is None:
             warnings.append("Synthesis service unavailable.")
-            answer = append_pastoral_guidance(
-                "I could not generate an answer right now. Please try again in a moment."
-            )
+            answer = _fallback_from_retrieval(doctrine_sources, contextual_sources)
 
         tone_score = evaluate_tone(answer)
 

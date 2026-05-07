@@ -1,8 +1,8 @@
 """Automatic training pipeline.
 
-Every response with a tone_score >= AUTO_TRAIN_THRESHOLD gets embedded directly
-into the contextual FAISS index. No manual review, no scripts to run — the system
-improves with every high-quality conversation automatically.
+Auto-training mutates the contextual FAISS index and is therefore disabled by
+default. Set AUTO_TRAIN_ENABLED=true to allow high-scoring responses to be
+embedded directly into retrieval.
 """
 
 from __future__ import annotations
@@ -20,7 +20,15 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 CONTEXT_INDEX_PATH = PROJECT_ROOT / "data" / "processed" / "wels_embeddings" / "context_faiss.index"
 CONTEXT_METADATA_PATH = PROJECT_ROOT / "data" / "processed" / "wels_embeddings" / "context_metadata.json"
 
-# Configurable via env var — default 0.75 means "reasonably good pastoral response"
+# Mutating retrieval indexes from runtime feedback must be opt-in.
+AUTO_TRAIN_ENABLED = os.getenv("AUTO_TRAIN_ENABLED", "").strip().lower() in {
+    "1",
+    "true",
+    "yes",
+    "on",
+}
+
+# Configurable via env var; only used when AUTO_TRAIN_ENABLED is true.
 AUTO_TRAIN_THRESHOLD = float(os.getenv("AUTO_TRAIN_THRESHOLD", "0.75"))
 EMBEDDING_MODEL_NAME = "all-MiniLM-L6-v2"
 EMBEDDING_DIM = 384  # all-MiniLM-L6-v2 output dimension
@@ -38,6 +46,9 @@ def maybe_auto_train(
     Returns True if training occurred, False otherwise.
     Never raises — training failures are logged but must not break chat.
     """
+    if not AUTO_TRAIN_ENABLED:
+        return False
+
     if tone_score < AUTO_TRAIN_THRESHOLD:
         return False
 

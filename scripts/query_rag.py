@@ -29,6 +29,13 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+CACHE_ROOT = PROJECT_ROOT / "data" / "cache"
+os.environ.setdefault("HF_HOME", str(CACHE_ROOT.resolve()))
+os.environ.setdefault("HUGGINGFACE_HUB_CACHE", str((CACHE_ROOT / "hub").resolve()))
+os.environ.setdefault(
+    "SENTENCE_TRANSFORMERS_HOME", str((CACHE_ROOT / "sentence-transformers").resolve())
+)
+
 # ---------------------------------------------------------------------
 # Utility fallbacks (so the file works standalone)
 try:
@@ -133,12 +140,12 @@ def append_pastoral_guidance(text: str) -> str:
 # Index resolver
 def _resolve_doctrine_paths() -> Tuple[Optional[Path], Optional[Path], str]:
     """Determine which doctrinal FAISS index to use. Returns None paths if none found."""
-    if WELS_INDEX_PATH.exists() and WELS_METADATA_PATH.exists():
-        logger.info("Using new WELS doctrinal index (wels_faiss.index).")
-        return WELS_INDEX_PATH, WELS_METADATA_PATH, "wels"
     if COMBINED_INDEX_PATH.exists() and COMBINED_METADATA_PATH.exists():
         logger.info("Using combined doctrinal index (combined_faiss.index).")
         return COMBINED_INDEX_PATH, COMBINED_METADATA_PATH, "combined"
+    if WELS_INDEX_PATH.exists() and WELS_METADATA_PATH.exists():
+        logger.info("Using WELS doctrinal index (wels_faiss.index).")
+        return WELS_INDEX_PATH, WELS_METADATA_PATH, "wels"
     if QA_INDEX_PATH.exists() and QA_METADATA_PATH.exists():
         logger.info("Using legacy QA doctrinal index (qa_faiss.index).")
         return QA_INDEX_PATH, QA_METADATA_PATH, "qa"
@@ -190,7 +197,31 @@ def get_cached_context_index() -> Tuple[Optional[faiss.Index], List[dict]]:
 def get_embedding_model() -> SentenceTransformer:
     global _MODEL_CACHE
     if _MODEL_CACHE is None:
-        _MODEL_CACHE = SentenceTransformer(EMBEDDING_MODEL_NAME)
+        local_snapshots_root = (
+            CACHE_ROOT
+            / "hub"
+            / "models--sentence-transformers--all-MiniLM-L6-v2"
+            / "snapshots"
+        )
+        model_path = EMBEDDING_MODEL_NAME
+        if local_snapshots_root.exists():
+            snapshots = sorted(
+                (p for p in local_snapshots_root.iterdir() if p.is_dir()),
+                key=lambda p: p.stat().st_mtime,
+                reverse=True,
+            )
+            snapshots = [
+                snapshot
+                for snapshot in snapshots
+                if (snapshot / "config.json").exists()
+                and (
+                    (snapshot / "model.safetensors").exists()
+                    or (snapshot / "pytorch_model.bin").exists()
+                )
+            ]
+            if snapshots:
+                model_path = str(snapshots[0])
+        _MODEL_CACHE = SentenceTransformer(model_path)
     return _MODEL_CACHE
 
 # ---------------------------------------------------------------------

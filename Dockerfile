@@ -26,8 +26,8 @@ ENV PYTHONUNBUFFERED=1
 ENV PYTHONPATH=/app
 ENV STREAMLIT_SERVER_HEADLESS=true
 
-# Railway uses port 8080 by default, but configurable
+# Hugging Face Spaces uses 7860 by default; other hosts can set PORT.
 EXPOSE 7860
 
 # Launch Streamlit
-CMD ["streamlit", "run", "app/Home.py", "--server.port=7860", "--server.address=0.0.0.0", "--server.headless=true"]
+CMD ["sh", "-c", "streamlit run app/Home.py --server.port=${PORT:-7860} --server.address=0.0.0.0 --server.headless=true"]

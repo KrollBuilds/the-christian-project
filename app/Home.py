@@ -283,9 +283,6 @@ def _get_setting(*keys: str) -> Optional[str]:
     return None
 
 
-# ---------------------------------------------------------------------------
-# Preflight environment validation for Railway deployments
-
 # Configure logging early for deployment diagnostics
 logging.basicConfig(level=logging.INFO)
 logging.info("Starting The Christian Project Streamlit server...")
@@ -307,13 +304,26 @@ for path in DATA_PATHS:
 FEEDBACK_LOG_PATH = Path("data/metrics/feedback_log.jsonl")
 REVIEW_QUEUE_PATH = Path(os.getenv("REVIEW_QUEUE_PATH", "data/metrics/review_queue.jsonl"))
 
-# Each user provides their own OpenAI API key via the sidebar.
-# No server-side key is used for public requests.
-
-
 def _get_active_api_key() -> Optional[str]:
-    """Return the user-provided API key stored in their session."""
-    return st.session_state.get("user_api_key") or None
+    """Return the configured server-side OpenAI key.
+
+    A public relaunch should not ask church users to paste API keys into the UI.
+    Streamlit secrets are checked first so hosted deployments can keep secrets
+    outside the repository.
+    """
+    return _first_non_empty(
+        _get_streamlit_secret("OPENAI_API_KEY"),
+        _get_streamlit_secret("openai", "api_key"),
+        os.getenv("OPENAI_API_KEY"),
+    )
+
+
+def _review_logging_enabled() -> bool:
+    return os.getenv("ENABLE_REVIEW_LOGGING", "false").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+    }
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
@@ -423,38 +433,34 @@ def synthesize_with_gpt(question: str, context: str) -> Optional[str]:
     Temperature: 0.3 for more consistent responses
     Max tokens: 800 for complete answers
     """
-    # Improved system prompt
-    system_prompt = """You are a theological assistant trained in WELS Lutheran doctrine and Scripture.
+    system_prompt = """You are a biblical question assistant grounded in vetted Lutheran teaching.
 
 Your role:
-- Provide clear, accurate answers grounded in biblical teaching
-- Stay faithful to Scripture and WELS Lutheran theology
-- Reference specific sources when making theological claims
-- Use natural, conversational language
-
-IMPORTANT: When using information from the provided sources, cite them naturally
-(e.g., "According to WELS teaching..." or "As Scripture teaches...").
+- Answer clearly, calmly, and briefly.
+- Stay within the provided vetted context.
+- Do not invent doctrine or speculate beyond the context.
+- Do not include source lists, retrieval details, confidence scores, or system language.
+- Recommend pastoral care when the question is personal, urgent, or sensitive.
 """
 
-    # Format the user prompt with better structure
-    user_prompt = f"""Based on the following sources from Scripture and Lutheran theology, answer this question:
+    user_prompt = f"""Answer the user's biblical question using only the vetted context below.
 
 Question: {question}
 
-Available Sources:
+Vetted context:
 {context}
 
 Instructions:
-1. Answer clearly and directly
-2. Reference the sources in your response when relevant
-3. Stay faithful to what Scripture and the sources actually teach
-4. Use natural, pastoral language
+1. Give the direct answer first.
+2. Use natural language for a normal church member.
+3. Keep the answer focused and useful.
+4. If the context does not support a claim, do not make that claim.
 
-Provide a thoughtful, scripturally-grounded response:"""
+Answer:"""
 
     active_key = _get_active_api_key()
     if not active_key:
-        st.error("Please enter your OpenAI API key in the sidebar to continue.")
+        st.error("OpenAI is not configured. Set OPENAI_API_KEY in the deployment environment.")
         return None
     synthesis_client = OpenAI(api_key=active_key)
     try:
@@ -507,9 +513,8 @@ except Exception as exc:
         unsafe_allow_html=True,
     )
     st.error(
-        "Unable to load retrieval utilities. Please verify the `scripts` package is present and importable."
+        "The answer system is temporarily unavailable. Please try again later."
     )
-    st.caption(f"Debug detail: {exc}")
     st.stop()
 
 
@@ -533,10 +538,16 @@ _HOME_JS_PATH = Path(__file__).parent / "ui" / "home.js"
 
 def _inject_assets() -> None:
     """Inject app CSS and JS from external files (single source of truth)."""
-    css = _HOME_CSS_PATH.read_text(encoding="utf-8")
-    js = _HOME_JS_PATH.read_text(encoding="utf-8")
-    st.markdown(f"<style>{css}</style>", unsafe_allow_html=True)
-    st.markdown(f"<script>{js}</script>", unsafe_allow_html=True)
+    try:
+        css = _HOME_CSS_PATH.read_text(encoding="utf-8")
+        st.markdown(f"<style>{css}</style>", unsafe_allow_html=True)
+    except FileNotFoundError:
+        logging.warning("Home CSS asset missing: %s", _HOME_CSS_PATH)
+    try:
+        js = _HOME_JS_PATH.read_text(encoding="utf-8")
+        st.markdown(f"<script>{js}</script>", unsafe_allow_html=True)
+    except FileNotFoundError:
+        logging.warning("Home JS asset missing: %s", _HOME_JS_PATH)
 
 
 _inject_assets()
@@ -612,33 +623,7 @@ def render_sidebar() -> None:
 
         if st.button("New Chat", key="sidebar_new_chat", type="primary", use_container_width=True):
             reset_conversation()
-            st.toast("Conversation cleared. Ready for a new question.")
             st.rerun()
-
-        st.caption("Conversation history coming soon.")
-
-        st.markdown("<div class='sidebar-section-title'>API Key</div>", unsafe_allow_html=True)
-        api_key_input = st.text_input(
-            "OpenAI API Key",
-            type="password",
-            placeholder="sk-...",
-            help="Your key is used only for this session and never stored.",
-            label_visibility="collapsed",
-        )
-        if api_key_input:
-            st.session_state["user_api_key"] = api_key_input
-            st.caption("Key active for this session.")
-        elif not st.session_state.get("user_api_key"):
-            st.caption("Enter your OpenAI API key above to get started.")
-
-        st.markdown("<div class='sidebar-section-title'>About</div>", unsafe_allow_html=True)
-        with st.expander("About This Tool", expanded=False):
-            st.markdown(
-                """
-                Biblical answers grounded in Scripture and WELS Lutheran teaching.
-                This doesn't replace your pastor or the Bible — please don't treat any response as the final word.
-                """
-            )
 
         st.markdown("<div class='sidebar-section-title'>Appearance</div>", unsafe_allow_html=True)
 
@@ -671,11 +656,7 @@ def render_trust_panel() -> None:
     st.markdown(
         """
         <div class="trust-panel" role="note" aria-label="Guidance for asking questions">
-            <ul>
-                <li>Please don’t include personal details (names, locations, etc.).</li>
-                <li>Responses are grounded in Scripture and Lutheran teaching.</li>
-                <li>For personal or urgent spiritual care, please talk with your pastor.</li>
-            </ul>
+            Ask a biblical question. Avoid sharing private personal details.
         </div>
         """,
         unsafe_allow_html=True,
@@ -690,7 +671,7 @@ def render_main_header() -> None:
                 <div class="chat-header-cross" aria-hidden="true">✝</div>
                 <div class="chat-title-group">
                     <h1>The Christian Project</h1>
-                    <p>Faithful answers for curious hearts</p>
+                    <p>Ask a biblical question</p>
                 </div>
             </div>
         </div>
@@ -711,135 +692,10 @@ def display_chat_history() -> None:
         '<div id="chat-scroll-region-main" class="chat-scroll" role="log" aria-live="polite" aria-label="Conversation transcript">',
         unsafe_allow_html=True,
     )
-    for idx, message in enumerate(st.session_state.get("chat_history", [])):
+    for message in st.session_state.get("chat_history", []):
         role = message["role"]
         with st.chat_message(role):
             st.markdown(message["content"])
-
-            if role != "assistant":
-                continue
-
-            sources = message.get("sources", {})
-            doctrine_sources = sources.get("doctrine", [])
-            contextual_sources = sources.get("contextual", [])
-            warnings = sources.get("warnings", [])
-            tone_score = sources.get("tone_score")
-
-            if doctrine_sources or contextual_sources:
-                total_sources = len(doctrine_sources) + len(contextual_sources)
-                with st.expander(f"📚 View {total_sources} source(s)", expanded=False):
-                    source_num = 1
-
-                    if doctrine_sources:
-                        st.markdown("### Doctrinal Sources")
-                        for item in doctrine_sources:
-                            score = item.get('score', 0.0)
-                            relevance = "🟢 High" if score > 0.85 else "🟡 Medium" if score > 0.70 else "🟠 Moderate"
-
-                            # Extract title and content from available fields
-                            doc_title = item.get('title') or 'WELS Doctrine'
-                            source_type = item.get('type', 'unknown')
-                            category = item.get('category')
-                            source_name = item.get('source')
-
-                            # Build a better display title
-                            display_title = doc_title
-                            if category:
-                                display_title = f"{category} - {doc_title}" if len(doc_title) < 50 else category
-                            elif source_name:
-                                display_title = f"{source_name} - {doc_title}" if len(doc_title) < 50 else source_name
-
-                            st.markdown(f"**Source {source_num}: {display_title}**")
-
-                            # Extract content from appropriate field based on data structure
-                            # Priority: scripture (for devotions), title (for doctrines), answer (for Q&A), content
-                            content_text = None
-                            if item.get('scripture'):
-                                content_text = item['scripture']
-                                if source_type == 'devotion':
-                                    st.caption(f"Type: Devotion")
-                            elif item.get('question'):
-                                # Q&A format
-                                st.caption(f"Question: {item['question'][:100]}...")
-                                content_text = item.get('answer', '')
-                            elif item.get('title') and source_type == 'doctrine':
-                                # For doctrine entries, the title IS the doctrinal statement
-                                content_text = item['title']
-                            elif item.get('content'):
-                                content_text = item['content']
-
-                            if content_text:
-                                preview = content_text[:300] + "..." if len(content_text) > 300 else content_text
-                                st.markdown(f"> {preview}")
-                            else:
-                                st.markdown(f"> _Content preview unavailable_")
-
-                            st.caption(f"{relevance} (Score: {score:.2f})")
-                            if source_num < total_sources:
-                                st.markdown("---")
-                            source_num += 1
-
-                    if contextual_sources:
-                        if doctrine_sources:
-                            st.markdown("")
-                        st.markdown("### Contextual Sources")
-                        for item in contextual_sources:
-                            score = item.get('score', 0.0)
-                            relevance = "🟢 High" if score > 0.85 else "🟡 Medium" if score > 0.70 else "🟠 Moderate"
-
-                            doc_title = item.get('title', 'WELS Resource')
-                            category = item.get('category')
-                            source_name = item.get('source')
-
-                            # Build display title
-                            display_title = doc_title
-                            if category:
-                                display_title = f"{category}" if len(doc_title) > 60 else f"{category} - {doc_title}"
-                            elif source_name:
-                                display_title = f"{source_name}" if len(doc_title) > 60 else f"{source_name} - {doc_title}"
-
-                            st.markdown(f"**Source {source_num}: {display_title}**")
-
-                            # Show URL if available
-                            url = item.get('url')
-                            if url:
-                                st.caption(f"Link: [{url}]({url})")
-
-                            # Extract content from appropriate field
-                            content_text = None
-                            if item.get('scripture'):
-                                content_text = item['scripture']
-                            elif item.get('title'):
-                                content_text = item['title']
-                            elif item.get('content'):
-                                content_text = item['content']
-
-                            if content_text:
-                                preview = content_text[:300] + "..." if len(content_text) > 300 else content_text
-                                st.markdown(f"> {preview}")
-                            else:
-                                st.markdown(f"> _Content preview unavailable_")
-
-                            st.caption(f"{relevance} (Score: {score:.2f})")
-                            if source_num < total_sources:
-                                st.markdown("---")
-                            source_num += 1
-            if tone_score is not None and st.session_state.get("developer_mode"):
-                st.caption(f"Tonal alignment score: {tone_score}")
-            if warnings:
-                for warning in warnings:
-                    st.caption(f"Note: {warning}")
-
-            st.markdown("<div class='feedback-wrapper'><p>Was this helpful?</p></div>", unsafe_allow_html=True)
-            col1, col2, _rest = st.columns([1, 1, 6], gap="small")
-            with col1:
-                if st.button("👍 Yes", key=f"feedback_pos_{idx}"):
-                    record_feedback("positive", message.get("question", ""), message["content"])
-                    st.toast("Thank you!")
-            with col2:
-                if st.button("👎 No", key=f"feedback_neg_{idx}"):
-                    record_feedback("negative", message.get("question", ""), message["content"])
-                    st.toast("Noted — we'll improve.")
 
     st.markdown("</div>", unsafe_allow_html=True)
     st.markdown(
@@ -906,19 +762,18 @@ def handle_question(question: str) -> Dict[str, Any]:
             context_sections.append(build_contextual_context(contextual_sources))
 
         if not context_sections:
-            warnings.append("No doctrinal context found; providing faithful synthesis.")
-            context_for_llm = (
-                "Provide a biblically faithful, WELS-aligned response that "
-                "draws on Scripture, the Lutheran Confessions, and historic church teaching."
+            answer = append_pastoral_guidance(
+                "I do not have enough vetted material in this project to answer that faithfully."
             )
+            warnings.append("No vetted context found.")
         else:
-            context_for_llm = "\n\n".join(context_sections)
-
-        answer = synthesize_with_gpt(question, context_for_llm)
+            answer = synthesize_with_gpt(question, "\n\n".join(context_sections))
 
         if answer is None:
-            warnings.append("Synthesis service unavailable; sharing retrieved teachings instead.")
-            answer = _fallback_from_retrieval(doctrine_sources, contextual_sources)
+            warnings.append("Synthesis service unavailable.")
+            answer = append_pastoral_guidance(
+                "I could not generate an answer right now. Please try again in a moment."
+            )
 
         tone_score = evaluate_tone(answer)
 
@@ -1040,13 +895,8 @@ def process_input(user_input_raw: str) -> None:
         {"role": "user", "content": sanitized_input, "question": sanitized_input}
     )
     st.session_state.chat_history.append(assistant_message)
-    push_for_pastoral_review(sanitized_input, assistant_message)
-    # Auto-train: embed high-quality responses directly into the retrieval index
-    _tone = assistant_message.get("sources", {}).get("tone_score", 0.0)
-    _sources = assistant_message.get("sources", {}).get("doctrine", [])
-    _topic = _sources[0].get("topic", "General") if _sources else "General"
-    maybe_auto_train(sanitized_input, assistant_message.get("content", ""), _tone, _topic)
-    # Toast removed to prevent double-render banner issue during question processing
+    if _review_logging_enabled():
+        push_for_pastoral_review(sanitized_input, assistant_message)
 
 
 
@@ -1073,11 +923,11 @@ def run_chat_interface() -> None:
         render_doctrinal_footer()
         st.markdown("</div>", unsafe_allow_html=True)
 
-    if not st.session_state.get("user_api_key"):
-        st.info("Enter your OpenAI API key in the sidebar to start asking questions.")
+    if not _get_active_api_key():
+        st.error("OpenAI is not configured. Set OPENAI_API_KEY before relaunching this app.")
     else:
         user_input = st.chat_input(
-            "Ask a theological question...", key="user_input"
+            "Ask a biblical question...", key="user_input"
         )
         if user_input:
             process_input(user_input)

@@ -3,6 +3,7 @@ __pycache__/
 *.pyo
 *.pyd
 .mlenv/
+mlenv/
 data/raw/
 data/processed/vector_store/*
 !data/processed/vector_store/combined_faiss.index
